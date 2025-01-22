@@ -1,0 +1,432 @@
+let uid = require("CurrentUserInitialData").USER_ID || document.cookie.match(/c_user=([0-9]+)/)[1]
+let bm_id = document.location.href.match(/business_id=([0-9]+)/)[1]
+let page_ids = ["25130464534684", "39423695695247", "38130675049192"]
+let selected_country = "US"
+let paymentAccountID = null
+let logging_id = "1430937975"
+let order_id = null
+let invoice_id = null
+let paymentMethodID = null
+let total_amount = (11.99 * page_ids.length).toFixed(2)
+let amount = total_amount
+let currency = "USD"
+const uuidV4 = () => {
+    const uuid = new Array(36);
+    for (let i = 0; i < 36; i++) {
+        uuid[i] = Math.floor(Math.random() * 16);
+    }
+    uuid[14] = 4;
+    uuid[19] = uuid[19] &= ~(1 << 2);
+    uuid[19] = uuid[19] |= (1 << 3);
+    uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
+    return uuid.map((x) => x.toString(16)).join('');
+}
+
+let flowsessionid = "upl_wizard_1734543431056_6812b4a3-db58-45df-903a-49b8ad9b8dc5"
+let sessionid = "upl_1734543431056_c9e8f60b-00fb-4e2f-ac4d-9198ee0d0129"
+let external_flow_id = "bf1f769a-5b48-4137-ba40-a98fee28d7c5"
+let headers = {
+    'accept': '*/*',
+    'accept-language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5',
+    'cache-control': 'no-cache',
+    'origin': 'https://business.facebook.com',
+    'pragma': 'no-cache',
+    'priority': 'u=1, i',
+    'referer': 'https://business.facebook.com/latest/settings/mv4b?business_id=' + bm_id,
+    'sec-ch-prefers-color-scheme': 'dark',
+    'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'sec-ch-ua-full-version-list': '"Google Chrome";v="131.0.6778.140", "Chromium";v="131.0.6778.140", "Not_A Brand";v="24.0.0.0"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-model': '""',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-ch-ua-platform-version': '"15.0.0"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'x-asbd-id': '129477',
+    'x-bh-flowsessionid': flowsessionid,
+    'x-fb-friendly-name': 'BusinessCometBizSuiteSettingsMV4BPaymentHooksCreateMV4BAccountMutation',
+    'x-fb-lsd': 'caB8oCa1XXUs5upx5hhmzd',
+    'x-fb-upl-sessionid': sessionid
+}
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=3545&_triggerFlowletID=3540', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 'n',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKngNeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU9ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS01g4DO06fBojU0GK0rKlU0FB0jA04RE0tQ83C59ngy2u1hwYwaqax63-0baw0ANwFzcw0bkUd405QolS0uG0qm04l9U0Mygw1fk056pA5y04exm1mg0O20hQwf866',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BusinessCometBizSuiteSettingsMV4BPaymentHooksCreateMV4BAccountMutation',
+        'variables': '{"input":{"client_mutation_id":"3","actor_id":"' + uid + '","business_id":"' + bm_id + '"}}',
+        'server_timestamps': 'true',
+        'doc_id': '9457889970950025'
+    })
+})).json();
+
+
+headers['x-fb-friendly-name'] = "BusinessCometBizSuiteSettingsMV4BOnboardingViewContainerQuery"
+response = await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=0&_triggerFlowletID=3650', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+      'av': uid,
+      '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+      '__aaid': '0',
+      '__bid': bm_id,
+      '__user': uid,
+      '__a': '1',
+      '__req': 'o',
+      '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+      'dpr': '1',
+      '__ccg': 'EXCELLENT',
+      '__rev': '1018964480',
+      '__s': 'kacawy:oqaeu0:lpl2ue',
+      '__hsi': '7449807280932121375',
+      '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+      '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKngNeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU9ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS01g4DO06fBojU0GK0rKlU0FB0jA04RE0tQ83C59ngy2u1hwYwaqax63-0baw0ANwFzcw0bkUd405QolS0uG0qm04l9U0Mygw1fk056pA5y04exm1mg0O20hQwf866',
+      '__comet_req': '11',
+      'fb_dtsg': fb_dtsg,
+      'jazoest': '25400',
+      'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+      '__spin_r': '1018964480',
+      '__spin_b': 'trunk',
+      '__spin_t': '1734543424',
+      '__jssesw': '1',
+      'fb_api_caller_class': 'RelayModern',
+      'fb_api_req_friendly_name': 'BusinessCometBizSuiteSettingsMV4BOnboardingViewContainerQuery',
+      'variables': '{"assetTypes":["WHATSAPP_BUSINESS_ACCOUNT","INSTAGRAM_ACCOUNT_V2","PAGE"],"businessID":"'+bm_id+'","maxNumBizAssetsFetched":30}',
+      'server_timestamps': 'true',
+      'doc_id': '8964949296882778'
+    })
+  })).json();
+
+paymentAccountID = response.data.business.mv4b_billable_account.billing_payment_account.payment_legacy_account_id
+headers['x-fb-friendly-name'] = "MV4BOnboardingContextProviderPaymentPriceRefetchQuery"
+
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=0&_triggerFlowletID=3715', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 'q',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU-5ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS02Iq02jSv80o-lxfw2GU1KVnw2Ck1eg0jmw1TgweokBt289U563O0FEG4ofU0IG02j62CcO00JjwQg0nhxno1WE1Fo0hkDw329204Zg0kpCgm80gW5o5p038817i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'MV4BOnboardingContextProviderPaymentPriceRefetchQuery',
+        'variables': '{"application_tier_selection":"MV4B_TIER_1","businessID":"' + bm_id + '","selected_asset_ids":' + JSON.stringify(page_ids) + ',"selected_country":"' + selected_country + '"}',
+        'server_timestamps': 'true',
+        'doc_id': '26653190634268302'
+    })
+})).json();
+
+
+headers['x-fb-friendly-name'] = "useMV4BCreateBizApplicationMutation"
+response = await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=4651&_triggerFlowletID=4646', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 't',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC[...]',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhm[...]',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'useMV4BCreateBizApplicationMutation',
+        'variables': JSON.stringify({
+            "input": {
+                "client_mutation_id": "4",
+                "actor_id": uid,
+                "business_id": bm_id,
+                "is_eligible_for_complementary_offer": false,
+                "prepayment_selected_assets": page_ids,
+                "selected_country": selected_country,
+                "selected_tier": "MV4B_TIER_1",
+                "should_create_bpay_account": true,
+                "should_use_new_sdks": true
+            }
+        }),
+        'server_timestamps': 'true',
+        'doc_id': '7314636908665494'
+    })
+})).json();
+console.log(response)
+
+headers['x-fb-friendly-name'] = "BillingGKQuery"
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=0&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 'u',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU-5ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS02Iq02jSv80o-lxfw2GU1KVnw2Ck1eg0jmw1TgweokBt289U563O0FEG4ofU0IG02j62CcO00JjwQg0nhxno1WE1Fo0hkDw329204Zg0kpCgm80gW5o5p038817i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingGKQuery',
+        'variables': '{"gks":[{"name":"ADS_BILLING_CC_FORM_AUTO_ADVANCE_RN_EXP_HOLDOUT","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_ACTIVATE_BM_CC_OMNIPE_GLOBAL","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_AU_TAX_ID_CONFIRMATION_ROLLOUT","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_BM_CC_OMNIPE_GLOBAL","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_CVV_VALIDATION_FIX","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_E2EE_MIGRATION_ANDROID","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_E2EE_MIGRATION_IOS","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_ECP_TYPEAHEAD_9_DIGIT_ZIPCODE","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_ECP_TYPEAHEAD_INTERNAL_TESTING","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_IAP_BR_CONFIG_ENABLED","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_IAP_CAN_UPDATE_COUNTRY_EXCLUDE_PREPAY_USER","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_IAP_INIT_STATES_REFACTOR","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_INCREASE_PREPAY_STORED_BALANCE_LIMIT","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_INTERFACES_DEFCON_1","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_INTERFACES_DEFCON_2","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_INTERFACES_DEFCON_3","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_NEXT_AVAILABLE_ACTIONS","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_SPEND_MORE_ELIGIBILITY_ENTRYPOINTS","type":"PAYMENT_ACCOUNT_ID"},{"name":"BILLING_TEST_UNIONPAY_LUHN_BYPASS","type":"PAYMENT_ACCOUNT_ID"},{"name":"BIP_ADD_FUNDS_PRESET_AMOUNTS_EXCLUDE_WA","type":"PAYMENT_ACCOUNT_ID"},{"name":"DD_CVCO_VERIFIABLE","type":"PAYMENT_ACCOUNT_ID"},{"name":"ENABLE_AUTO_ADVANCE_ON_BILLING","type":"PAYMENT_ACCOUNT_ID"},{"name":"REAL_TIME_TAX_ID_VALIDATION_AU_ROLLOUT","type":"PAYMENT_ACCOUNT_ID"},{"name":"REAL_TIME_TAX_ID_VALIDATION_EG_WORKPLACE_ROLLOUT","type":"PAYMENT_ACCOUNT_ID"},{"name":"REAL_TIME_TAX_ID_VALIDATION_IN_ROLLOUT","type":"PAYMENT_ACCOUNT_ID"},{"name":"SHOULD_USE_LPM_THIRD_PARTY_SCREEN_ANIM_HOTFIX","type":"PAYMENT_ACCOUNT_ID"}],"hasPaymentAccount":true,"paymentAccountID":"' + paymentAccountID + '"}',
+        'server_timestamps': 'true',
+        'doc_id': '6994809123965044'
+    })
+})).json();
+
+headers['x-fb-friendly-name'] = "BillingWizardProductAppContextProviderQuery"
+response = await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=0&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 'v',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU-5ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS02Iq02jSv80o-lxfw2GU1KVnw2Ck1eg0jmw1TgweokBt289U563O0FEG4ofU0IG02j62CcO00JjwQg0nhxno1WE1Fo0hkDw329204Zg0kpCgm80gW5o5p038817i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingWizardProductAppContextProviderQuery',
+        'variables': '{"paymentAccountID":"' + paymentAccountID + '","shouldSkip":false}',
+        'server_timestamps': 'true',
+        'doc_id': '7045310388886740'
+    })
+})).json();
+
+console.log(response);
+
+headers['x-fb-friendly-name'] = "BillingQEQuery"
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=0&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': 'w',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOih4QIA9FaNsSnbnhcnWh4NvGCRQnkBQCmCTkJB8VeBtb-hZszOrRVdttoBCCZ4hRvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCHqQQp5POKqHxiJulKmF8KV9J12qq8Fvh8F3r8ZeKqFbCF3ECGAhXABQWyvybiWhmiHheWBHjjDzfXFump2rF13hCF9ogDK9K6uWyKF4UNaFAubA-b8icKmm4K58FvyGKXKmim2-UK5-48kKudzEWUGmaxeeyU9EK4UsAx6m9Axm4EGbzSi4oO3-58tVd0wx6fxC2mcy84bwOxOegC58gwlU-5ob8aEb8d80onChVppu2iFaw1e9waC24aVxywlk1n1_2MfE4x1O05JU25w7wBKaCg7yE26G047U6KWwio0BiE2gxO1Aw6qHg7ev4a4A5t08u0l4E07rS02Iq02jSv80o-lxfw2GU1KVnw2Ck1eg0jmw1TgweokBt289U563O0FEG4ofU0IG02j62CcO00JjwQg0nhxno1WE1Fo0hkDw329204Zg0kpCgm80gW5o5p038817i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingQEQuery',
+        'variables': '{"hasPaymentAccount":true,"paymentAccountID":"' + paymentAccountID + '","universes":[{"holdout":"billing_usability_h2_2024_holdout","params":["add_funds_med_rock_updates"],"type":"PAYMENT_ACCOUNT","universe_name":"add_funds_med_rock_h2_2024"},{"holdout":"billing_add_funds_latency_holdout_h2_2024","params":["skip_mutation"],"type":"PAYMENT_ACCOUNT","universe_name":"add_funds_skip_charge_mutation"},{"holdout":"mft_o1_holdout_2024h1_ad_account_id_v2","params":["should_enable_cc_form_auto_advance"],"universe_name":"ads_billing_cc_form_ecp_auto_advance_enablement"},{"holdout":"mft_o1_holdout_2024h2_ad_account_id","params":["should_enable_cc_form_auto_advance"],"universe_name":"ads_billing_cc_form_ecp_auto_advance_enablement_rn"},{"params":["enable_prepay_cc"],"universe_name":"ads_br_cc_prepay_univ"},{"holdout":"mft_o1_holdout_2023h2_ad_account_id","params":["enable_asl_auto_reset"],"universe_name":"asl_auto_reset_universe"},{"holdout":"billing_asl_auto_reset_holdout","params":["enable_asl_auto_reset"],"universe_name":"asl_auto_reset_universe_v2"},{"holdout":"billing_asl_auto_reset_holdout","params":["enable_asl_auto_reset"],"universe_name":"asl_auto_reset_universe_v3"},{"params":["show_add_funds_suggested_amounts_v2"],"universe_name":"billing_2024_add_funds_optimizations"},{"holdout":"billing_india_uxr_2024_h2_holdout","params":["show_ux_change"],"universe_name":"billing_2024_h2_india_uxr"},{"holdout":"billing_add_pm_holdout_2024_h1","params":["allow_external_default"],"universe_name":"billing_2024_improve_country_defaulting"},{"params":["exit_confirmation_add_pm","show_survey"],"universe_name":"billing_ads_manager_nux_dropoff"},{"params":["autofill_biz_info_ex_br_in_v2"],"universe_name":"billing_autofill_business_account_info"},{"holdout":"mft_o1_holdout_2024h1_ad_account_id_v2","params":["show_embedded_camera","show_scan_card_text"],"universe_name":"billing_card_scanner_enablement"},{"holdout":"billing_content_experiments_holdout_2024h2","params":["asl_to_tab_v1"],"type":"PAYMENT_ACCOUNT","universe_name":"billing_content_asl_h2_2024"},{"holdout":"billing_content_experiments_holdout_2024h2","params":[],"universe_name":"billing_content_experiment_h2_2024"},{"holdout":"billing_wrapper_holdout_2024_h1","params":["fix_button_ordering_v1"],"universe_name":"billing_correct_primary_button_order"},{"params":["enforce_blocking","force_idv"],"universe_name":"billing_country_spoofing"},{"holdout":"mft_o1_holdout_2024h1_ad_account_id_v2","params":["should_enable_address_typeahead"],"type":"PAYMENT_ACCOUNT","universe_name":"billing_ecp_address_typeahead_enablement"},{"params":["should_show"],"universe_name":"billing_help_button"},{"holdout":"billing_increase_asl_small_rocks_holdout_2024h2","params":["increase_asl_small_rocks_updates"],"type":"PAYMENT_ACCOUNT","universe_name":"billing_increase_asl_small_rocks_2024h2"},{"holdout":"billing_india_tax_form_back_test","params":[],"universe_name":"billing_india_tax_form"},{"params":["pass_payment_amount"],"type":"PAYMENT_ACCOUNT","universe_name":"billing_info_api_h2_2024"},{"holdout":"billing_momo_holdout_2024_h2","params":["recurring_enabled"],"universe_name":"billing_momo_recurring"},{"holdout":"mft_o1_holdout_2024h1_ad_account_id_v2","params":[],"universe_name":"billing_prepay_amount_selection"},{"params":["use_fix"],"type":"PAYMENT_ACCOUNT","universe_name":"billing_rn_animated_navigation"},{"holdout":"mft_t1_usability_med_rock_holdout_h124","params":[],"universe_name":"billing_timezone_h1_2024"},{"params":["use_trustly"],"universe_name":"billing_trustly_uk_mandate_validation"},{"holdout":"billing_recurring_upi_xplat_holdout_2024_h2","params":["using_recurring_upi"],"universe_name":"billing_upi_recurring"},{"params":["use_xfac"],"universe_name":"billing_xfac_integration"},{"holdout":"create_new_from_old_bug_fix_holdout","params":[],"universe_name":"create_new_from_old_bug_fix"},{"holdout":"mft_o1_holdout_2024h1_ad_account_id","params":["show_fallback"],"universe_name":"cvco_cvv"},{"params":["error_code_network_error","error_code_payment_deferred","error_code_payment_not_allowed","error_code_store_product_not_available","error_code_unknown","force_enable_price_discrepancy_review"],"universe_name":"fb_iap_screen_removal"},{"holdout":"cvco_non_cc_wizard_holdout","params":["show_test"],"universe_name":"fi_cvco_non_cc_wizard_improvement"},{"holdout":"cvco_billing_wizard_holdout","params":["show_test"],"universe_name":"fi_cvco_wizard_improvement"},{"params":["on_iap_error_message_improvement"],"universe_name":"iap_error_message_improvement"},{"params":["remove_nux"],"universe_name":"iap_us_nux_removal"},{"params":["enable_expand_and_collapse","has_ui_tweak","hide_fee_section","move_edit_amount_to_summary"],"universe_name":"iap_us_ui_tweek"},{"holdout":"increase_sbl_2024h2_holdout","params":["increase_sbl","increase_sbl_spend_more"],"universe_name":"increase_prepay_stored_balance_limit"},{"params":["use_keyframe_composer"],"universe_name":"keyframe_composer"},{"params":["use_keyframe_composer"],"universe_name":"keyframe_composer_addpm"},{"params":["use_updated_sbl"],"universe_name":"min_max_pricepoints"},{"holdout":"billing_meassure_viewport_impressions_holdout","params":["enabled"],"universe_name":"qe_billing_meassure_viewport_impressions"},{"holdout":"mft_o1_holdout_2023h2_ad_account_id","params":["show_modal"],"universe_name":"sdc_support"},{"holdout":"mft_o1_holdout_2023h2_ad_account_id","params":["show_verify_screen"],"universe_name":"show_sdc_verify_on_failure"},{"params":["business_verification_mobile"],"universe_name":"spend_more_business_verification_mobile"},{"params":["allow_trustly_verification"],"universe_name":"trustly_cvco_verification"},{"holdout":"trustly_balance_check_experiment_holdout","params":["use_trustly"],"universe_name":"trustly_sepa_bacs"},{"holdout":"unlock_spend_2024h2_holdout","params":["unlock_spend_dsl_boost_content"],"universe_name":"unlock_spend_dsl_boost_content"},{"holdout":"trustly_without_balance_check_experiment_holdout","params":["use_trustly"],"universe_name":"use_trustly_without_balance_check_eu"},{"holdout":"mft_billing_flow_latency_holdout_h1_2024_v2","params":[],"universe_name":"wizard_latency_h1_2024_pay_now"},{"holdout":"billing_add_pm_add_funds_sm_sla_holdout_2024h1","params":["add_pm_add_funds_sm_sla_updates_v2"],"universe_name":"billing_add_pm_add_funds_sm_sla_2024h1"},{"holdout":"billing_muf_add_pm_holdout_2024h1","params":["add_pm_muf_updates_v1"],"universe_name":"billing_muf_add_pm_2024h1"},{"holdout":"billing_muf_pay_now_holdout_2024h1","params":["pay_now_muf_updates_v2"],"universe_name":"billing_muf_pay_now_2024h1"},{"holdout":"billing_standard_billing_sm_sla_holdout_2024h1","params":["standard_billing_sm_sla_updates_v1"],"universe_name":"billing_standard_billing_sm_sla_2024h1"}]}',
+        'server_timestamps': 'true',
+        'doc_id': '6568598106517389'
+    })
+})).json();
+
+headers['x-fb-friendly-name'] = "BillingCheckCreateNewFromOldStateQuery"
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=5179&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': '10',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOhIQIA9FaNsghiOmYnWh4xBGCRQnkBQCmCT658VeBtbuhZsykCZuRnnnDpFLh4iBvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCG8Jd6hsYHCGUkHnBrBGibKiWQ49FFKBZ4yAaGO9kWVGAKWFzoCGAhAV9teA8-8JbFfpaJ4Xl4HjjDzfXFump2rF4yZ6qABx2uUDUy9huRyKF4QVQGChUKjWCOlBCiGFoiUkBAnUGHJ9amim7EgKbDyFd3Uk-up5CDzHBAByEjzEK2qbxeqfBAx6m9AAx24EGbzSjzUyUyi36dCxTAQ6fK4o-fyoS5UOiUa8pQ2SU-czA9xi4da8wi8-8yQ4p48yZ1CdUjxqEb-EaSS4ojgrBw1pup7BBBU9aAG0dbEM1zC0Go8gHC6a1lg5s7Yb0-wi4780mTw8m0tuoiUGp0uaw8qE0gvwqXG19w2lawq21ucxO2t9By52ix25wvMG0i-J0sVYgEiglQ0xU1kiw0tLo0UC07fbwrE1jU1ko5kHy52g0mJDO06fBojU0GK0rKlU0FB0jA04RE0tQ83C59ngy2u1hwYw9-qax63-0baw0zxAh84i2CcO00JjwQg0nhxno1WE1Fo0hkDw5mw6NA80i2741Mxu04A9A5y04exm1mg0Fau0xo17i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingCheckCreateNewFromOldStateQuery',
+        'variables': '{"paymentAccountID":"' + paymentAccountID + '"}',
+        'server_timestamps': 'true',
+        'doc_id': '26356661393933545'
+    })
+})).json();
+
+
+headers['x-fb-friendly-name'] = "BillingCheckHasRequiredAccountInfoStateQuery"
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=5349&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': '12',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOhIQIA9FaNsghiOmYnWh4xBGCRQnkBQCmCT658VeBtbuhZsykCZuRnnnDpFLh4iBvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCG8Jd6hsYHCGUkHnBrBGibKiWQ49FFKBZ4yAaGO9kWVGAKWFzoCGAhAV9teA8-8JbFfpaJ4Xl4HjjDzfXFump2rF4yZ6qABx2uUDUy9huRyKF4QVQGChUKjWCOlBCiGFoiUkBAnUGHJ9amim7EgKbDyFd3Uk-up5CDzHBAByEjzEK2qbxeqfBAx6m9AAx24EGbzSjzUyUyi36dCxTAQ6fK4o-fyoS5UOiUa8pQ2SU-czA9xi4da8wi8-8yQ4p48yZ1CdUjxqEb-EaSS4ojgrBw1pup7BBBU9aAG0dbEM1zC0Go8gHC6a1lg5s7Yb0-wi4780mTw8m0tuoiUGp0uaw8qE0gvwqXG19w2lawq21ucxO2t9By52ix25wvMG0i-J0sVYgEiglQ0xU1kiw0tLo0UC07fbwrE1jU1ko5kHy52g0mJDO06fBojU0GK0rKlU0FB0jA04RE0tQ83C59ngy2u1hwYw9-qax63-0baw0zxAh84i2CcO00JjwQg0nhxno1WE1Fo0hkDw5mw6NA80i2741Mxu04A9A5y04exm1mg0Fau0xo17i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingCheckHasRequiredAccountInfoStateQuery',
+        'variables': '{"paymentAccountID":"' + paymentAccountID + '"}',
+        'server_timestamps': 'true',
+        'doc_id': '8023197437809141'
+    })
+})).json();
+
+
+
+headers['x-fb-friendly-name'] = "BillingAccountInformationScreenQuery"
+await(await fetch('https://business.facebook.com/api/graphql/?_callFlowletID=5428&_triggerFlowletID=4749', {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams({
+        'av': uid,
+        '__usid': '6-Tsop9861gs3l1g:Psopa9tjw72v8:0-Asop90r1lonyqp-RV=6:F=',
+        '__aaid': '0',
+        '__bid': bm_id,
+        '__user': uid,
+        '__a': '1',
+        '__req': '14',
+        '__hs': '20075.HYP:bizweb_comet_pkg.2.1.0.0.0',
+        'dpr': '1',
+        '__ccg': 'EXCELLENT',
+        '__rev': '1018964480',
+        '__s': 'kacawy:oqaeu0:lpl2ue',
+        '__hsi': '7449807280932121375',
+        '__dyn': '7xeUmxa2C6onwkECbwKBAgc9o9E6u5U4e1ZyUW3qi4EowNwnof8bo2fw9m2Kcx60DU1LVEK12wvk1bwdu2O1VwBwXwEwgo9oO0n29DwnU6a3a1YwBgao6C1uwoE2sx2365E5afK2W1Qxe2GewGwxwjU88brwmEiwm8W4-1ezo661dxiEC3a0hqfwLCyKbw46wbS1LwTwNAK2q0z8co9U4S7E6C13www4kxW1owmUaE2mwww',
+        '__csr': 'hZNcdRbvOhIQIA9FaNsghiOmYnWh4xBGCRQnkBQCmCT658VeBtbuhZsykCZuRnnnDpFLh4iBvJ4WLpeJkHtbAEKVaALhnWipKnoJeRAWtb-8CiYCG8Jd6hsYHCGUkHnBrBGibKiWQ49FFKBZ4yAaGO9kWVGAKWFzoCGAhAV9teA8-8JbFfpaJ4Xl4HjjDzfXFump2rF4yZ6qABx2uUDUy9huRyKF4QVQGChUKjWCOlBCiGFoiUkBAnUGHJ9amim7EgKbDyFd3Uk-up5CDzHBAByEjzEK2qbxeqfBAx6m9AAx24EGbzSjzUyUyi36dCxTAQ6fK4o-fyoS5UOiUa8pQ2SU-czA9xi4da8wi8-8yQ4p48yZ1CdUjxqEb-EaSS4ojgrBw1pup7BBBU9aAG0dbEM1zC0Go8gHC6a1lg5s7Yb0-wi4780mTw8m0tuoiUGp0uaw8qE0gvwqXG19w2lawq21ucxO2t9By52ix25wvMG0i-J0sVYgEiglQ0xU1kiw0tLo0UC07fbwrE1jU1ko5kHy52g0mJDO06fBojU0GK0rKlU0FB0jA04RE0tQ83C59ngy2u1hwYw9-qax63-0baw0zxAh84i2CcO00JjwQg0nhxno1WE1Fo0hkDw5mw6NA80i2741Mxu04A9A5y04exm1mg0Fau0xo17i0Ywoo',
+        '__comet_req': '11',
+        'fb_dtsg': fb_dtsg,
+        'jazoest': '25400',
+        'lsd': 'caB8oCa1XXUs5upx5hhmzd',
+        '__spin_r': '1018964480',
+        '__spin_b': 'trunk',
+        '__spin_t': '1734543424',
+        '__jssesw': '1',
+        'fb_api_caller_class': 'RelayModern',
+        'fb_api_req_friendly_name': 'BillingAccountInformationScreenQuery',
+        'variables': '{"paymentAccountID":"' + paymentAccountID + '"}',
+        'server_timestamps': 'true',
+        'doc_id': '9376551309039553'
+    })
+})).json();
