@@ -1,0 +1,2060 @@
+// =========== CONFIGURATIONS ===========
+const CONFIG = {
+  INITIAL_BALANCE: {
+    MONEY: 500000000,
+    GOLD: 231
+  },
+  DATE_FORMAT: "yyyy-MM-dd HH:mm:ss",
+  USER: "duyennle",
+  START_DATE: "2025-02-17 13:17:11",
+  // Sửa tên các tài khoản ngân hàng
+  BANK_ACCOUNTS: ["bank1-vcb Chu", "bank2-Tech Nhái", "bank3-bank Ba", "Tiền mặt"],
+  GOLD_TYPES: ["3S", "4S"],
+  TIMEZONE_OFFSET: 7,
+  
+  // Hàm format date time
+  formatDateTime: function(date = new Date()) {
+    const vietnamTime = new Date(date.getTime() + (this.TIMEZONE_OFFSET * 60 * 60 * 1000));
+    const year = vietnamTime.getUTCFullYear();
+    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');
+    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');
+    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  },
+  GOLD_PRICE_DIFF: 10000, // Chênh lệch giá giữa 4S và 3S
+  
+  // Thêm hàm helper để chuyển đổi giá giữa các loại vàng
+  convertGoldPrice: function(price, fromType, toType) {
+    if (fromType === toType) return price;
+    return fromType === "3S" ? price + this.GOLD_PRICE_DIFF : price - this.GOLD_PRICE_DIFF;
+  }
+};
+
+// Hàm tiện ích chuyển đổi thời gian
+function getHanoiTime(date = new Date()) {
+  const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+  const year = vietnamTime.getUTCFullYear();
+  const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(vietnamTime.getUTCDate()).padStart(2, '0');
+  const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// Hàm tiện ích lấy ngày hiện tại theo định dạng YYYY-MM-DD
+function getCurrentDate() {
+  const now = new Date();
+  const vietnamTime = new Date(now.getTime() + (CONFIG.TIMEZONE_OFFSET * 60 * 60 * 1000));
+  const year = vietnamTime.getUTCFullYear();
+  const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(vietnamTime.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const SHEETS = {
+  CONFIG: "CONFIG",
+  TRANSACTIONS: "GIAO DỊCH HÀNG NGÀY",
+  TRACKING: "TRACKING LỆNH",
+  INVENTORY: "INVENTORY",
+  BANK: "BANK_ACCOUNTS",
+  DASHBOARD: "DASHBOARD"
+};
+
+const COLUMNS = {
+  TRANSACTIONS: [
+    "ID Giao dịch",
+    "Timestamp",
+    "Loại GD",
+    "Loại vàng",
+    "Khối lượng",
+    "Giá",
+    "Thành tiền",
+    "Đối tác",
+    "SĐT đối tác",
+    "Tài khoản GD",
+    "Hình thức",
+    "Ngày hẹn",
+    "Mã gốc",
+    "Khối lượng còn lại",
+    "Lãi/lỗ dự kiến",
+    "Lãi/lỗ thực tế",
+    "SL", // Thêm cột Stop Loss
+    "TP", // Thêm cột Take Profit
+    "Ghi chú"
+  ],
+  TRACKING: [
+    "ID Giao dịch",
+    "Loại lệnh",
+    "Trạng thái",
+    "Liên kết mã",
+    "Khối lượng gốc",
+    "Khối lượng đã thực hiện",
+    "Khối lượng còn lại",
+    "Lãi/lỗ từng phần",
+    "Tổng lãi/lỗ"
+  ],
+  INVENTORY: [
+    "Loại vàng",
+    "Tồn kho thực tế",
+    "Trong lệnh hẹn",
+    "Đã bán chờ mua",
+    "Tổng theo sổ sách",
+    "Chênh lệch",
+    "Cập nhật lần cuối"
+  ],
+  BANK: [
+    "Tài khoản",
+    "Số dư thực tế",
+    "Số dư sổ sách",
+    "Trong lệnh hẹn",
+    "Chênh lệch",
+    "Cập nhật lần cuối"
+  ]
+};
+
+// =========== INITIALIZATION ===========
+function onOpen() {
+  createCustomMenu();
+}
+
+function initializeSystem() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Create sheets
+  Object.values(SHEETS).forEach(sheetName => {
+    if (!ss.getSheetByName(sheetName)) {
+      ss.insertSheet(sheetName);
+    }
+  });
+  
+  // Setup each sheet
+  setupConfigSheet();
+  setupTransactionsSheet();
+  setupTrackingSheet();
+  setupInventorySheet();
+  setupBankSheet();
+  setupDashboardSheet();
+  
+  // Create menu
+  createCustomMenu();
+}
+
+// =========== SHEET SETUP FUNCTIONS ===========
+function setupConfigSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
+  sheet.clear();
+  
+  const configData = [
+    ["Giá mua 3S", ""],
+    ["Giá bán 3S", ""],
+    ["Giá mua 4S", ""],
+    ["Giá bán 4S", ""],
+    ["Last Updated", new Date().toISOString()],
+    ["Initial Money", CONFIG.INITIAL_BALANCE.MONEY],
+    ["Initial Gold", CONFIG.INITIAL_BALANCE.GOLD]
+  ];
+  
+  sheet.getRange(1, 1, configData.length, 2).setValues(configData);
+  sheet.getRange("A:A").setFontWeight("bold");
+}
+
+function setupTransactionsSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  sheet.clear();
+  
+  // Headers
+  sheet.getRange(1, 1, 1, COLUMNS.TRANSACTIONS.length)
+    .setValues([COLUMNS.TRANSACTIONS])
+    .setFontWeight("bold")
+    .setBackground("#E8EAED");
+  
+  // Formats
+  sheet.getRange("B:B").setNumberFormat(CONFIG.DATE_FORMAT);
+  sheet.getRange("E:E").setNumberFormat("#,##0.00");
+  sheet.getRange("F:G").setNumberFormat("#,##0");
+  sheet.getRange("L:L").setNumberFormat(CONFIG.DATE_FORMAT);
+  sheet.getRange("O:P").setNumberFormat("#,##0");
+  sheet.getRange("Q:R").setNumberFormat("#,##0"); // Format for SL and TP
+}
+
+function setupTrackingSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRACKING);
+  sheet.clear();
+  
+  sheet.getRange(1, 1, 1, COLUMNS.TRACKING.length)
+    .setValues([COLUMNS.TRACKING])
+    .setFontWeight("bold")
+    .setBackground("#E8EAED");
+  
+  sheet.getRange("E:G").setNumberFormat("#,##0.00");
+  sheet.getRange("H:I").setNumberFormat("#,##0");
+}
+
+function setupInventorySheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INVENTORY);
+  sheet.clear();
+  
+  // Headers
+  sheet.getRange(1, 1, 1, COLUMNS.INVENTORY.length)
+    .setValues([COLUMNS.INVENTORY])
+    .setFontWeight("bold")
+    .setBackground("#E8EAED");
+  
+  // Initial data
+  const inventoryData = CONFIG.GOLD_TYPES.map(type => [
+    type,
+    type === "3S" ? CONFIG.INITIAL_BALANCE.GOLD : 0,
+    0,
+    0,
+    type === "3S" ? CONFIG.INITIAL_BALANCE.GOLD : 0,
+    0,
+    new Date().toISOString()
+  ]);
+  
+  sheet.getRange(2, 1, inventoryData.length, COLUMNS.INVENTORY.length)
+    .setValues(inventoryData);
+  
+  sheet.getRange("B:E").setNumberFormat("#,##0.00");
+  sheet.getRange("G:G").setNumberFormat(CONFIG.DATE_FORMAT);
+}
+
+function setupBankSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.BANK);
+  sheet.clear();
+  
+  // Headers
+  sheet.getRange(1, 1, 1, COLUMNS.BANK.length)
+    .setValues([COLUMNS.BANK])
+    .setFontWeight("bold")
+    .setBackground("#E8EAED");
+  
+  // Initial data
+  const bankData = CONFIG.BANK_ACCOUNTS.map(account => [
+    account,
+    account === "Ngân hàng 1" ? CONFIG.INITIAL_BALANCE.MONEY : 0,
+    account === "Ngân hàng 1" ? CONFIG.INITIAL_BALANCE.MONEY : 0,
+    0,
+    0,
+    new Date().toISOString()
+  ]);
+  
+  sheet.getRange(2, 1, bankData.length, COLUMNS.BANK.length)
+    .setValues(bankData);
+  
+  sheet.getRange("B:E").setNumberFormat("#,##0");
+  sheet.getRange("F:F").setNumberFormat(CONFIG.DATE_FORMAT);
+}
+
+function setupDashboardSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.DASHBOARD);
+  sheet.clear();
+  
+  sheet.getRange('A1').setValue('DASHBOARD - TỔNG QUAN');
+  sheet.getRange('A1:E1')
+    .merge()
+    .setFontWeight('bold')
+    .setBackground('#E8EAED');
+}
+
+// =========== FORM HANDLING ===========
+function createFormHtml(title, formId, fields) {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <style>
+          body { font-family: Arial, sans-serif; padding: 10px; }
+          .form-group { margin-bottom: 15px; }
+          label { display: block; margin-bottom: 5px; font-weight: bold; }
+          input, select { width: 100%; padding: 8px; box-sizing: border-box; }
+          .submit-btn { background-color: #4CAF50; color: white; padding: 10px; border: none; cursor: pointer; }
+          .submit-btn:hover { background-color: #45a049; }
+            .message-box {
+    white-space: pre-line;
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+        </style>
+      </head>
+      <body>
+        <form id="${formId}" onsubmit="handleSubmit(event)">
+          ${fields}
+          <div class="form-group">
+            <input type="submit" value="Xác nhận" class="submit-btn">
+          </div>
+        </form>
+        <script>
+          function handleSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('${formId}');
+            const formData = new FormData(form);
+            const data = {
+              formId: '${formId}'
+            };
+            
+            formData.forEach((value, key) => {
+              data[key] = value;
+            });
+            
+            google.script.run
+              .withSuccessHandler(function(response) {
+                if (response.success) {
+                  alert(response.message);
+                  google.script.host.close();
+                } else {
+                  alert('Lỗi: ' + response.message);
+                }
+              })
+              .withFailureHandler(function(error) {
+                alert('Lỗi: ' + error);
+              })
+              .processFormSubmission(data);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+}
+
+function showBuyForm() {
+  const fields = `
+    <div class="form-group">
+      <label>
+        <input type="checkbox" name="isClosingTrade" id="isClosingTrade" onchange="toggleOriginalFields()">
+        Chốt lệnh (có mã gốc)
+      </label>
+    </div>
+    <div id="originalFields" style="display:none;">
+      <div class="form-group">
+        <label>Mã gốc:</label>
+        <input type="text" name="originalId" onchange="updateOriginalInfo()">
+      </div>
+      <div id="originalInfo"></div>
+      <div id="profitLossPreview"></div>
+    </div>
+    <div class="form-group">
+      <label>Loại vàng:</label>
+      <select name="goldType" required onchange="updateAllCalculations()">
+        ${CONFIG.GOLD_TYPES.map(type => `<option value="${type}">${type}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Khối lượng (chỉ):</label>
+      <input type="number" name="amount" step="0.00001" min="0" required onchange="updateAllCalculations()">
+    </div>
+    <div class="form-group">
+      <label>Giá (4 số đầu):</label>
+      <input type="number" name="price" required onchange="updateAllCalculations()">
+    </div>
+    <div class="form-group">
+      <label>Stop Loss (SL):</label>
+      <input type="number" name="sl" required>
+      <small class="suggestion" id="slSuggestion"></small>
+    </div>
+    <div class="form-group">
+      <label>Take Profit (TP):</label>
+      <input type="number" name="tp" required>
+      <small class="suggestion" id="tpSuggestion"></small>
+    </div>
+    <div class="form-group">
+      <label>Đối tác:</label>
+      <input type="text" name="partner" required>
+    </div>
+    <div class="form-group">
+      <label>SĐT đối tác:</label>
+      <input type="tel" name="phone" required>
+    </div>
+    <div class="form-group">
+      <label>Tài khoản:</label>
+      <select name="account" required>
+        ${CONFIG.BANK_ACCOUNTS.map(acc => `<option value="${acc}">${acc}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Hình thức:</label>
+      <select name="tradeType" required>
+        <option value="Giao ngay">Giao ngay</option>
+        <option value="Hẹn trả">Hẹn trả</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Ngày hẹn:</label>
+      <input type="datetime-local" name="dueDate">
+    </div>
+    <script>
+      function toggleOriginalFields() {
+        var isClosing = document.getElementById('isClosingTrade').checked;
+        document.getElementById('originalFields').style.display = isClosing ? 'block' : 'none';
+        if (!isClosing) {
+          document.getElementById('originalInfo').innerHTML = '';
+          document.getElementById('profitLossPreview').innerHTML = '';
+        }
+      }
+
+      function updateOriginalInfo() {
+        var originalId = document.getElementsByName('originalId')[0].value;
+        if (!originalId) return;
+        
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result) {
+              var infoDiv = document.getElementById('originalInfo');
+              infoDiv.innerHTML = '<div class="info-box">' +
+                '<p><strong>Thông tin lệnh gốc:</strong></p>' +
+                '<p>Loại: ' + result.type + '</p>' +
+                '<p>Vàng: ' + result.goldType + '</p>' +
+                '<p>Giá: ' + result.price.toLocaleString('vi-VN') + '</p>' +
+                '<p>Khối lượng: ' + result.amount + '</p>' +
+                '</div>';
+              
+              // Tự động điền khối lượng
+              document.getElementsByName('amount')[0].value = result.amount;
+              
+              // Cập nhật các tính toán
+              updateAllCalculations();
+            }
+          })
+          .findTransaction(originalId);
+      }
+
+      function updateAllCalculations() {
+        updateSuggestions();
+        updateProfitLossPreview();
+      }
+
+      function updateSuggestions() {
+        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        var amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (price && !isNaN(price)) {
+          var sl = Math.round(price * 0.998); // -0.2%
+          var tp = Math.round(price * 1.0025); // +0.25%
+          
+          document.getElementsByName('sl')[0].value = sl;
+          document.getElementsByName('tp')[0].value = tp;
+          
+          document.getElementById('slSuggestion').textContent = 
+            'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (-0.2%)';
+          document.getElementById('tpSuggestion').textContent = 
+            'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (+0.25%)';
+        }
+      }
+
+      function updateProfitLossPreview() {
+        var isClosing = document.getElementById('isClosingTrade').checked;
+        if (!isClosing) return;
+
+        var originalId = document.getElementsByName('originalId')[0].value;
+        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        var goldType = document.getElementsByName('goldType')[0].value;
+        var amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (originalId && price && goldType && amount) {
+          google.script.run
+            .withSuccessHandler(function(preview) {
+              document.getElementById('profitLossPreview').innerHTML = preview;
+            })
+            .calculateProfitLossPreview(originalId, price, goldType, amount);
+        }
+      }
+    </script>
+    <style>
+      .suggestion {
+        color: #666;
+        font-size: 0.9em;
+        display: block;
+        margin-top: 5px;
+      }
+      .info-box {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      .info-box p {
+        margin: 5px 0;
+      }
+      #originalFields {
+        border-left: 3px solid #4CAF50;
+        padding-left: 10px;
+        margin: 10px 0;
+      }
+    </style>
+  `;
+  
+  var html = HtmlService.createHtmlOutput(createFormHtml('Nhập lệnh MUA', 'buyForm', fields))
+    .setWidth(400)
+    .setHeight(750);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Nhập lệnh MUA');
+}
+
+// Hàm tính preview lãi/lỗ
+function calculateProfitLossPreview(originalId, price, goldType, amount) {
+  var originalTx = findTransaction(originalId);
+  if (!originalTx) return 'Không tìm thấy giao dịch gốc';
+  
+  var normalizedPrice = CONFIG.convertGoldPrice(price, goldType, originalTx.goldType);
+  var pl = amount * (normalizedPrice - originalTx.price);
+  
+  return '<div class="info-box">' +
+    '<p><strong>Dự tính lãi/lỗ:</strong></p>' +
+    '<p>Giao dịch gốc (' + originalTx.goldType + '): ' + originalTx.price.toLocaleString('vi-VN') + '</p>' +
+    '<p>Giá chốt (' + goldType + '): ' + price.toLocaleString('vi-VN') + '</p>' +
+    '<p>Giá quy đổi về ' + originalTx.goldType + ': ' + normalizedPrice.toLocaleString('vi-VN') + '</p>' +
+    '<p>Lãi/Lỗ dự kiến: ' + pl.toLocaleString('vi-VN') + '</p>' +
+    '</div>';
+}
+
+function showSellForm() {
+  const fields = `
+    <div class="form-group">
+      <label>
+        <input type="checkbox" name="isClosingTrade" id="isClosingTrade" onchange="toggleOriginalFields()">
+        Chốt lệnh (có mã gốc)
+      </label>
+    </div>
+    <div id="originalFields" style="display:none;">
+      <div class="form-group">
+        <label>Mã gốc:</label>
+        <input type="text" name="originalId" onchange="updateOriginalInfo()">
+      </div>
+      <div id="originalInfo"></div>
+      <div id="profitLossPreview"></div>
+    </div>
+    <div class="form-group">
+      <label>Loại vàng:</label>
+      <select name="goldType" required onchange="updateAllCalculations()">
+        ${CONFIG.GOLD_TYPES.map(type => `<option value="${type}">${type}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Khối lượng (chỉ):</label>
+      <input type="number" name="amount" step="0.00001" min="0" required onchange="updateAllCalculations()">
+    </div>
+    <div class="form-group">
+      <label>Giá (4 số đầu):</label>
+      <input type="number" name="price" required onchange="updateAllCalculations()">
+    </div>
+    <div class="form-group">
+      <label>Stop Loss (SL):</label>
+      <input type="number" name="sl" required>
+      <small class="suggestion" id="slSuggestion"></small>
+    </div>
+    <div class="form-group">
+      <label>Take Profit (TP):</label>
+      <input type="number" name="tp" required>
+      <small class="suggestion" id="tpSuggestion"></small>
+    </div>
+    <div class="form-group">
+      <label>Đối tác:</label>
+      <input type="text" name="partner" required>
+    </div>
+    <div class="form-group">
+      <label>SĐT đối tác:</label>
+      <input type="tel" name="phone" required>
+    </div>
+    <div class="form-group">
+      <label>Tài khoản:</label>
+      <select name="account" required>
+        ${CONFIG.BANK_ACCOUNTS.map(acc => `<option value="${acc}">${acc}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Hình thức:</label>
+      <select name="tradeType" required>
+        <option value="Giao ngay">Giao ngay</option>
+        <option value="Hẹn trả">Hẹn trả</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Ngày hẹn:</label>
+      <input type="datetime-local" name="dueDate">
+    </div>
+    <script>
+      function toggleOriginalFields() {
+        var isClosing = document.getElementById('isClosingTrade').checked;
+        document.getElementById('originalFields').style.display = isClosing ? 'block' : 'none';
+        if (!isClosing) {
+          document.getElementById('originalInfo').innerHTML = '';
+          document.getElementById('profitLossPreview').innerHTML = '';
+        }
+      }
+
+      function updateOriginalInfo() {
+        var originalId = document.getElementsByName('originalId')[0].value;
+        if (!originalId) return;
+        
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result) {
+              var infoDiv = document.getElementById('originalInfo');
+              infoDiv.innerHTML = '<div class="info-box">' +
+                '<p><strong>Thông tin lệnh gốc:</strong></p>' +
+                '<p>Loại: ' + result.type + '</p>' +
+                '<p>Vàng: ' + result.goldType + '</p>' +
+                '<p>Giá: ' + result.price.toLocaleString('vi-VN') + '</p>' +
+                '<p>Khối lượng: ' + result.amount + '</p>' +
+                '</div>';
+              
+              // Tự động điền khối lượng còn lại
+              var remainingAmount = result.amount;
+              if (result.remainingAmount !== undefined) {
+                remainingAmount = result.remainingAmount;
+              }
+              document.getElementsByName('amount')[0].value = remainingAmount;
+              
+              // Cập nhật các tính toán
+              updateAllCalculations();
+            }
+          })
+          .findTransaction(originalId);
+      }
+
+      function updateAllCalculations() {
+        updateSuggestions();
+        updateProfitLossPreview();
+      }
+
+      function updateSuggestions() {
+        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        var amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (price && !isNaN(price)) {
+          // Đối với lệnh bán, đảo ngược SL và TP
+          var sl = Math.round(price * 1.002); // +0.2%
+          var tp = Math.round(price * 0.9975); // -0.25%
+          
+          document.getElementsByName('sl')[0].value = sl;
+          document.getElementsByName('tp')[0].value = tp;
+          
+          document.getElementById('slSuggestion').textContent = 
+            'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (+0.2%)';
+          document.getElementById('tpSuggestion').textContent = 
+            'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (-0.25%)';
+        }
+      }
+
+      function updateProfitLossPreview() {
+        var isClosing = document.getElementById('isClosingTrade').checked;
+        if (!isClosing) return;
+
+        var originalId = document.getElementsByName('originalId')[0].value;
+        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        var goldType = document.getElementsByName('goldType')[0].value;
+        var amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (originalId && price && goldType && amount) {
+          google.script.run
+            .withSuccessHandler(function(preview) {
+              document.getElementById('profitLossPreview').innerHTML = preview;
+            })
+            .calculateProfitLossPreviewForSell(originalId, price, goldType, amount);
+        }
+      }
+    </script>
+    <style>
+      .suggestion {
+        color: #666;
+        font-size: 0.9em;
+        display: block;
+        margin-top: 5px;
+      }
+      .info-box {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      .info-box p {
+        margin: 5px 0;
+      }
+      #originalFields {
+        border-left: 3px solid #e74c3c;
+        padding-left: 10px;
+        margin: 10px 0;
+      }
+    </style>
+  `;
+  
+  var html = HtmlService.createHtmlOutput(createFormHtml('Nhập lệnh BÁN', 'sellForm', fields))
+    .setWidth(400)
+    .setHeight(750);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Nhập lệnh BÁN');
+}
+
+// Thêm hàm tính preview lãi/lỗ cho lệnh bán
+function calculateProfitLossPreviewForSell(originalId, price, goldType, amount) {
+  var originalTx = findTransaction(originalId);
+  if (!originalTx) return 'Không tìm thấy giao dịch gốc';
+  
+  var normalizedPrice = CONFIG.convertGoldPrice(price, goldType, originalTx.goldType);
+  // Đối với lệnh bán, công thức tính lãi/lỗ sẽ ngược lại
+  var pl = amount * (originalTx.price - normalizedPrice);
+  
+  return '<div class="info-box">' +
+    '<p><strong>Dự tính lãi/lỗ:</strong></p>' +
+    '<p>Giao dịch gốc (' + originalTx.goldType + '): ' + originalTx.price.toLocaleString('vi-VN') + '</p>' +
+    '<p>Giá bán (' + goldType + '): ' + price.toLocaleString('vi-VN') + '</p>' +
+    '<p>Giá quy đổi về ' + originalTx.goldType + ': ' + normalizedPrice.toLocaleString('vi-VN') + '</p>' +
+    '<p>Lãi/Lỗ dự kiến: ' + pl.toLocaleString('vi-VN') + '</p>' +
+    '</div>';
+}
+
+function showAddGoldForm() {
+  const fields = `
+    <div class="form-group">
+      <label>Loại vàng:</label>
+      <select name="goldType" required>
+        ${CONFIG.GOLD_TYPES.map(type => `<option value="${type}">${type}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Khối lượng (chỉ):</label>
+      <input type="number" name="amount" step="0.00001" min="0" required>
+    </div>
+    <div class="form-group">
+      <label>Nguồn vàng:</label>
+      <input type="text" name="source" required>
+    </div>
+  `;
+  
+  const html = HtmlService.createHtmlOutput(createFormHtml('Thêm vàng', 'addGoldForm', fields))
+    .setWidth(300)
+    .setHeight(250);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Thêm vàng');
+}
+
+// =========== RECONCILIATION FUNCTIONS ===========
+function showGoldReconciliation() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INVENTORY);
+  
+  // Get current book values
+  const goldData = sheet.getRange("A2:B3").getValues();
+  const book3S = goldData[0][1];
+  const book4S = goldData[1][1];
+  
+  // Prompt for actual values
+  const response3S = ui.prompt(
+    'Đối soát vàng 3S',
+    `Số sổ sách: ${book3S}\nNhập số thực tế:`,
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response3S.getSelectedButton() !== ui.Button.OK) return;
+  
+  const response4S = ui.prompt(
+    'Đối soát vàng 4S',
+    `Số sổ sách: ${book4S}\nNhập số thực tế:`,
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response4S.getSelectedButton() !== ui.Button.OK) return;
+  
+  // Update values
+  const actual3S = parseFloat(response3S.getResponseText());
+  const actual4S = parseFloat(response4S.getResponseText());
+  
+  sheet.getRange("B2:C3").setValues([
+    [actual3S, actual3S - book3S],
+    [actual4S, actual4S - book4S]
+  ]);
+  
+  sheet.getRange("G2:G3").setValue(new Date().toISOString());
+  
+  ui.alert('Đối soát hoàn tất',
+    `3S - Sổ sách: ${book3S}, Thực tế: ${actual3S}, Chênh lệch: ${actual3S - book3S}\n` +
+    `4S - Sổ sách: ${book4S}, Thực tế: ${actual4S}, Chênh lệch: ${actual4S - book4S}`,
+    ui.ButtonSet.OK
+  );
+}
+
+function showMoneyReconciliation() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.BANK);
+  
+  CONFIG.BANK_ACCOUNTS.forEach((account, index) => {
+    const row = index + 2;
+    const bookBalance = sheet.getRange(`B${row}`).getValue();
+    
+    const response = ui.prompt(
+      `Đối soát ${account}`,
+      `Số sổ sách: ${bookBalance}\nNhập số thực tế:`,
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (response.getSelectedButton() !== ui.Button.OK) return;
+    
+    const actualBalance = parseFloat(response.getResponseText());
+    sheet.getRange(`B${row}:D${row}`).setValues([[
+      actualBalance,
+      actualBalance,
+      actualBalance - bookBalance
+    ]]);
+    
+    sheet.getRange(`F${row}`).setValue(new Date().toISOString());
+  });
+  
+  ui.alert('Đối soát tiền hoàn tất', 'Đã cập nhật tất cả các tài khoản', ui.ButtonSet.OK);
+}
+
+// =========== REPORT FUNCTIONS ===========
+function generateDailyReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const today = getCurrentDate();
+  const reportName = `Báo cáo ${today}`;
+  
+  // Create new sheet for report
+  let reportSheet = ss.getSheetByName(reportName);
+  if (reportSheet) {
+    reportSheet.clear();
+  } else {
+    reportSheet = ss.insertSheet(reportName);
+  }
+  
+  // Report header
+  reportSheet.getRange('A1:D1')
+    .setValues([[`BÁO CÁO NGÀY ${today}`, '', '', '']])
+    .merge()
+    .setFontWeight('bold')
+    .setBackground('#E8EAED');
+  
+  // Get today's transactions
+  const txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
+  const txData = txSheet.getDataRange().getValues();
+  const todayTx = txData.filter(row => {
+    if (row[0] === 'ID Giao dịch') return false;
+    const txDate = new Date(row[1]).toISOString().split('T')[0];
+    return txDate === today;
+  });
+  
+  // Summary
+  const summary = {
+    buy: {count: 0, amount: 0, value: 0},
+    sell: {count: 0, amount: 0, value: 0}
+  };
+  
+  todayTx.forEach(tx => {
+    const type = tx[2];
+    const amount = parseFloat(tx[4]);
+    const value = parseFloat(tx[6]);
+    
+    if (type === 'MUA') {
+      summary.buy.count++;
+      summary.buy.amount += amount;
+      summary.buy.value += value;
+    } else {
+      summary.sell.count++;
+      summary.sell.amount += amount;
+      summary.sell.value += value;
+    }
+  });
+  
+  // Write summary
+  const summaryData = [
+    ['TỔNG HỢP GIAO DỊCH', '', '', ''],
+    ['', 'Số lệnh', 'Khối lượng', 'Giá trị'],
+    ['MUA', summary.buy.count, summary.buy.amount, summary.buy.value],
+    ['BÁN', summary.sell.count, summary.sell.amount, summary.sell.value]
+  ];
+  
+  reportSheet.getRange('A3:D6').setValues(summaryData);
+  reportSheet.getRange('C4:C7').setNumberFormat('#,##0.00000');
+  reportSheet.getRange('D4:D7').setNumberFormat('#,##0');
+  
+  // Format
+  reportSheet.autoResizeColumns(1, 4);
+}
+
+function showReportOptions() {
+  const fields = `
+    <div class="form-group">
+      <label>Từ ngày:</label>
+      <input type="date" name="fromDate" required>
+    </div>
+    <div class="form-group">
+      <label>Đến ngày:</label>
+      <input type="date" name="toDate" required>
+    </div>
+    <div class="form-group">
+      <label>Loại báo cáo:</label>
+      <select name="reportType" required>
+        <option value="all">Tất cả giao dịch</option>
+        <option value="buy">Chỉ lệnh MUA</option>
+        <option value="sell">Chỉ lệnh BÁN</option>
+        <option value="pending">Lệnh hẹn trả</option>
+      </select>
+    </div>
+  `;
+  
+  const html = HtmlService.createHtmlOutput(createFormHtml('Tùy chọn báo cáo', 'reportForm', fields))
+    .setWidth(300)
+    .setHeight(250);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Tùy chọn báo cáo');
+}
+
+// =========== DATA PROCESSING FUNCTIONS ===========
+
+// Generate Transaction ID
+function generateTransactionId(type) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const lastRow = sheet.getLastRow();
+  
+  // Xác định prefix dựa trên loại giao dịch
+  let prefix;
+  switch(type) {
+    case 'MUA':
+      prefix = 'B'; // Buy
+      break;
+    case 'BÁN':
+      prefix = 'S'; // Sell
+      break;
+    case 'NAP_TIEN':
+    case 'NAP_VANG':
+      prefix = 'NAP';
+      break;
+    default:
+      prefix = 'TX'; // Transaction (cho các loại khác nếu có)
+  }
+  
+  if (lastRow === 1) {
+    return `${prefix}00001`;
+  }
+  
+  // Tìm ID cuối cùng cùng loại
+  const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  let maxNumber = 0;
+  
+  for (let i = data.length - 1; i >= 0; i--) {
+    const currentId = String(data[i][0]);
+    if (currentId.startsWith(prefix)) {
+      const number = parseInt(currentId.slice(prefix.length));
+      if (!isNaN(number) && number > maxNumber) {
+        maxNumber = number;
+      }
+    }
+  }
+  
+  // Tạo ID mới
+  const newNumber = maxNumber + 1;
+  const paddedNumber = String(newNumber).padStart(5, '0');
+  return `${prefix}${paddedNumber}`;
+}
+
+// Cập nhật hàm findTransaction để bao gồm khối lượng còn lại
+function findTransaction(transactionId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  var data = sheet.getDataRange().getValues();
+  
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === transactionId) {
+      var remainingAmount = data[i][4]; // Khối lượng ban đầu
+      if (data[i][13] !== '') { // Nếu có khối lượng còn lại
+        remainingAmount = parseFloat(data[i][13]);
+      }
+      
+      return {
+        type: data[i][2],
+        goldType: data[i][3],
+        amount: data[i][4],
+        remainingAmount: remainingAmount,
+        price: data[i][5],
+        total: data[i][6]
+      };
+    }
+  }
+  
+  return null;
+}
+
+function processTransaction(formData, type) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
+  
+  // Generate ID and prepare data
+  const id = generateTransactionId(type);
+  const timestamp = getHanoiTime();
+  const amount = parseFloat(parseFloat(formData.amount).toFixed(5));
+  const price = parseInt(formData.price) * 1000;
+  const total = amount * price;
+  const sl = parseInt(formData.sl);
+  const tp = parseInt(formData.tp);
+
+  let actualPL = 0;
+  let plNote = '';
+  
+  if (formData.originalId) {
+    actualPL = calculateActualPL(amount, price, formData.goldType, formData.originalId);
+    const originalTx = findTransaction(formData.originalId);
+    if (originalTx) {
+      plNote = `\nThông tin chốt lệnh:
+        Mã gốc: ${formData.originalId} (${originalTx.goldType})
+        Giá gốc: ${originalTx.price.toLocaleString('vi-VN')}
+        Chốt bằng: ${formData.goldType}
+        Giá chốt: ${price.toLocaleString('vi-VN')}
+        Giá quy đổi: ${CONFIG.convertGoldPrice(price, formData.goldType, originalTx.goldType).toLocaleString('vi-VN')}
+        Lãi/Lỗ: ${actualPL.toLocaleString('vi-VN')}`;
+    }
+  }
+
+  // Prepare row data
+  const rowData = [
+    id,                     // ID Giao dịch
+    timestamp,             // Timestamp
+    type,                 // Loại GD
+    formData.goldType,    // Loại vàng
+    amount,              // Khối lượng
+    price,              // Giá
+    total,             // Thành tiền
+    formData.partner,  // Đối tác
+    formData.phone,   // SĐT đối tác
+    formData.account, // Tài khoản GD
+    formData.tradeType, // Hình thức
+    formData.dueDate || '', // Ngày hẹn
+    formData.originalId || '', // Mã gốc
+    '', // Khối lượng còn lại
+    calculateExpectedPL(amount, price, formData.goldType, type), // Lãi/lỗ dự kiến
+    actualPL, // Lãi/lỗ thực tế
+    formData.sl, // SL
+    formData.tp, // TP
+    plNote // Ghi chú
+  ];
+  
+  // Add transaction
+  txSheet.appendRow(rowData);
+  
+  // Update related data
+  updateInventory(formData.goldType, type === 'MUA' ? amount : -amount, formData.tradeType);
+  updateBankAccount(formData.account, type === 'MUA' ? -total : total, formData.tradeType);
+  
+  if (formData.tradeType === 'Hẹn trả') {
+    addToTracking(id, type, amount, formData);
+  }
+  
+  if (type === 'BÁN' && formData.originalId) {
+    updateOriginalTransaction(formData.originalId, amount);
+  }
+
+  return {
+    success: true,
+    message: `Đã thêm giao dịch ${id}\n\nĐiểm dừng:\nSL: ${sl.toLocaleString('vi-VN')}\nTP: ${tp.toLocaleString('vi-VN')}`,
+    data: rowData
+  };
+}
+
+// Update Inventory
+function updateInventory(goldType, amount, tradeType) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INVENTORY);
+  const row = goldType === '3S' ? 2 : 3;
+  
+  // Get current values
+  const currentStock = sheet.getRange(`B${row}`).getValue();
+  const pendingAmount = sheet.getRange(`C${row}`).getValue();
+  
+  // Calculate new values
+  let newStock = currentStock;
+  let newPending = pendingAmount;
+  
+  if (tradeType === 'Giao ngay') {
+    newStock += amount;
+  } else {
+    newPending += amount;
+  }
+  newStock = parseFloat(newStock.toFixed(5));
+  newPending = parseFloat(newPending.toFixed(5));
+  // Update values
+  sheet.getRange(`B${row}:C${row}`).setValues([[newStock, newPending]]);
+  sheet.getRange(`E${row}`).setValue(newStock + newPending); // Tổng
+  sheet.getRange(`G${row}`).setValue(new Date().toISOString());
+}
+
+// Update Bank Account
+function updateBankAccount(accountName, amount, tradeType) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.BANK);
+  const accounts = sheet.getRange('A:A').getValues().flat();
+  const row = accounts.indexOf(accountName) + 1;
+  
+  if (row < 1) return;
+  
+  // Get current values
+  const currentBalance = sheet.getRange(`B${row}`).getValue();
+  const pendingAmount = sheet.getRange(`D${row}`).getValue();
+  
+  // Calculate new values
+  let newBalance = currentBalance;
+  let newPending = pendingAmount;
+  
+  if (tradeType === 'Giao ngay') {
+    newBalance += amount;
+  } else {
+    newPending += amount;
+  }
+  
+  // Update values
+  sheet.getRange(`B${row}:D${row}`).setValues([[newBalance, newBalance, newPending]]);
+  sheet.getRange(`F${row}`).setValue(new Date().toISOString());
+}
+
+// Add to Tracking
+function addToTracking(id, type, amount, formData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRACKING);
+  
+  const rowData = [
+    id,                    // ID Giao dịch
+    type,                 // Loại lệnh
+    'Pending',           // Trạng thái
+    formData.originalId || '', // Liên kết mã
+    amount,             // Khối lượng gốc
+    0,                 // Khối lượng đã thực hiện
+    amount,           // Khối lượng còn lại
+    0,               // Lãi/lỗ từng phần
+    0                // Tổng lãi/lỗ
+  ];
+  
+  sheet.appendRow(rowData);
+}
+
+// Update Original Transaction
+function updateOriginalTransaction(originalId, soldAmount) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === originalId) {
+      const remainingAmount = parseFloat(data[i][4]) - soldAmount;
+      sheet.getRange(i + 1, 14).setValue(remainingAmount); // Khối lượng còn lại
+      break;
+    }
+  }
+}
+
+// Calculate Expected P/L
+function calculateExpectedPL(amount, price, goldType, transactionType) {
+  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
+  const marketPrices = {
+    '3S': {
+      buy: configSheet.getRange('B1').getValue() * 1000,
+      sell: configSheet.getRange('B2').getValue() * 1000
+    },
+    '4S': {
+      buy: configSheet.getRange('B3').getValue() * 1000,
+      sell: configSheet.getRange('B4').getValue() * 1000
+    }
+  };
+  
+  const marketPrice = transactionType === 'MUA' 
+    ? marketPrices[goldType].sell 
+    : marketPrices[goldType].buy;
+  
+  return amount * (transactionType === 'MUA' 
+    ? (marketPrice - price) 
+    : (price - marketPrice));
+}
+
+// Calculate Actual P/L
+function calculateActualPL(amount, sellPrice, sellGoldType, originalId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === originalId) {
+      const buyPrice = data[i][5];
+      const buyGoldType = data[i][3];
+      
+      // Chuyển đổi giá về cùng loại vàng để tính
+      const normalizedSellPrice = CONFIG.convertGoldPrice(sellPrice, sellGoldType, buyGoldType);
+      
+      const pl = amount * (normalizedSellPrice - buyPrice);
+      
+      Logger.log(`Tính lãi/lỗ:
+        Mã gốc: ${originalId}
+        Giá mua (${buyGoldType}): ${buyPrice}
+        Giá bán (${sellGoldType}): ${sellPrice}
+        Giá bán quy đổi về ${buyGoldType}: ${normalizedSellPrice}
+        Khối lượng: ${amount}
+        Lãi/Lỗ: ${pl}
+      `);
+      
+      return pl;
+    }
+  }
+  
+  return 0;
+}
+
+// Process Form Submission
+function processFormSubmission(formData) {
+  Logger.log('Received form data:', formData); // For debugging
+  
+  try {
+    let result;
+    switch(formData.formId) {
+      case 'buyForm':
+        result = processTransaction(formData, 'MUA');
+        break;
+      case 'sellForm':
+        result = processTransaction(formData, 'BÁN');
+        break;
+      case 'addMoneyForm':
+        result = processAddMoney(formData);
+        break;
+      case 'addGoldForm':
+        result = processAddGold(formData);
+        break;
+      case 'reportForm':
+        result = processReportForm(formData);
+        break;
+      default:
+        throw new Error('Không xác định được loại form');
+    }
+    
+    // Log successful operation
+    Logger.log('Operation completed successfully:', {
+      formId: formData.formId,
+      timestamp: new Date().toISOString(),
+      user: CONFIG.USER,
+      result: result
+    });
+    
+    return {
+      success: true,
+      message: result.message
+    };
+  } catch (error) {
+    // Log error details
+    Logger.log('Error in processFormSubmission:', {
+      formId: formData.formId,
+      timestamp: new Date().toISOString(),
+      user: CONFIG.USER,
+      error: error.toString()
+    });
+    
+    return {
+      success: false,
+      message: error.toString()
+    };
+  }
+}
+
+// Helper function for report processing
+function processReportForm(formData) {
+  // Validate dates
+  if (!formData.fromDate || !formData.toDate) {
+    throw new Error('Vui lòng chọn khoảng thời gian báo cáo');
+  }
+  
+  // Validate report type
+  const validReportTypes = ['all', 'buy', 'sell', 'pending'];
+  if (!validReportTypes.includes(formData.reportType)) {
+    throw new Error('Loại báo cáo không hợp lệ');
+  }
+  
+  // Generate report
+  return generateCustomReport(formData.fromDate, formData.toDate, formData.reportType);
+}
+
+// =========== MONEY AND GOLD MANAGEMENT ===========
+function processAddMoney(formData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.BANK);
+  const amount = parseFloat(formData.amount);
+  const accounts = sheet.getRange('A:A').getValues().flat();
+  const row = accounts.indexOf(formData.account) + 1;
+  
+  if (row < 1) {
+    throw new Error('Không tìm thấy tài khoản');
+  }
+  
+  // Get current balance
+  const currentBalance = sheet.getRange(`B${row}`).getValue();
+  const newBalance = currentBalance + amount;
+  
+  // Update balance
+  sheet.getRange(`B${row}:C${row}`).setValues([[newBalance, newBalance]]);
+  sheet.getRange(`F${row}`).setValue(getHanoiTime());
+  
+  // Add to transactions
+  const txSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const id = generateTransactionId('NAP_TIEN');
+  const rowData = [
+    id,
+    getHanoiTime(),
+    'NAP_TIEN',
+    '',
+    0,
+    0,
+    amount,
+    formData.source,
+    '',
+    formData.account,
+    'Giao ngay',
+    '',
+    '',
+    '',
+    0,
+    0,
+    'Nạp tiền vào tài khoản'
+  ];
+  
+  txSheet.appendRow(rowData);
+  
+  return {
+    success: true,
+    message: `Đã thêm ${amount.toLocaleString('vi-VN')} VND vào tài khoản ${formData.account}`
+  };
+}
+
+function processAddGold(formData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.INVENTORY);
+  const amount = parseFloat(formData.amount);
+  const row = formData.goldType === '3S' ? 2 : 3;
+  
+  // Get current amount
+  const currentAmount = sheet.getRange(`B${row}`).getValue();
+  const newAmount = currentAmount + amount;
+  
+  // Update inventory
+  sheet.getRange(`B${row}`).setValue(newAmount);
+  sheet.getRange(`E${row}`).setValue(newAmount); // Update total
+  sheet.getRange(`G${row}`).setValue(getHanoiTime());
+  
+  // Add to transactions
+  const txSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const id = generateTransactionId('NAP_VANG');
+  const rowData = [
+    id,
+    getHanoiTime(),
+    'NAP_VANG',
+    formData.goldType,
+    amount,
+    0,
+    0,
+    formData.source,
+    '',
+    'Tiền mặt',
+    'Giao ngay',
+    '',
+    '',
+    '',
+    0,
+    0,
+    'Nạp vàng vào kho'
+  ];
+  
+  txSheet.appendRow(rowData);
+  
+  return {
+    success: true,
+    message: `Đã thêm ${amount.toFixed(5)} chỉ vàng ${formData.goldType} vào kho`
+  };
+}
+
+// =========== REPORT GENERATION ===========
+function generateCustomReport(fromDate, toDate, reportType) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const reportName = `Báo cáo ${fromDate} đến ${toDate}`;
+  
+  // Create or clear report sheet
+  let reportSheet = ss.getSheetByName(reportName);
+  if (reportSheet) {
+    reportSheet.clear();
+  } else {
+    reportSheet = ss.insertSheet(reportName);
+  }
+  
+  // Report header
+  reportSheet.getRange('A1:F1')
+    .setValues([[`BÁO CÁO TỪ ${fromDate} ĐẾN ${toDate}`, '', '', '', '', '']])
+    .merge()
+    .setFontWeight('bold')
+    .setBackground('#E8EAED');
+  
+  // Get transactions
+  const txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
+  const txData = txSheet.getDataRange().getValues();
+  const headers = txData[0];
+  
+  // Filter transactions
+  const filteredTx = txData.slice(1).filter(row => {
+    const txDate = new Date(row[1]);
+    const startDate = getCurrentDate(); 
+    const endDate = new Date(toDate);
+    endDate.setHours(23, 59, 59);
+    
+    if (txDate < startDate || txDate > endDate) return false;
+    
+    switch(reportType) {
+      case 'buy':
+        return row[2] === 'MUA';
+      case 'sell':
+        return row[2] === 'BÁN';
+      case 'pending':
+        return row[10] === 'Hẹn trả';
+      default:
+        return true;
+    }
+  });
+  
+  // Write transactions
+  if (filteredTx.length > 0) {
+    reportSheet.getRange(3, 1, 1, headers.length)
+      .setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#E8EAED');
+    
+    reportSheet.getRange(4, 1, filteredTx.length, headers.length)
+      .setValues(filteredTx);
+  }
+  
+  // Calculate summary
+  const summary = {
+    transactions: filteredTx.length,
+    buy: {
+      count: 0,
+      amount: 0,
+      value: 0
+    },
+    sell: {
+      count: 0,
+      amount: 0,
+      value: 0
+    }
+  };
+  
+  filteredTx.forEach(tx => {
+    if (tx[2] === 'MUA') {
+      summary.buy.count++;
+      summary.buy.amount += parseFloat(tx[4]);
+      summary.buy.value += parseFloat(tx[6]);
+    } else if (tx[2] === 'BÁN') {
+      summary.sell.count++;
+      summary.sell.amount += parseFloat(tx[4]);
+      summary.sell.value += parseFloat(tx[6]);
+    }
+  });
+  
+  // Write summary
+  const summaryData = [
+    ['TỔNG HỢP', '', '', '', ''],
+    ['Tổng số giao dịch:', summary.transactions, '', '', ''],
+    ['', 'Số lệnh', 'Khối lượng', 'Giá trị', ''],
+    ['MUA:', summary.buy.count, summary.buy.amount, summary.buy.value, ''],
+    ['BÁN:', summary.sell.count, summary.sell.amount, summary.sell.value, '']
+  ];
+  
+  const summaryRange = reportSheet.getRange(filteredTx.length + 6, 1, summaryData.length, 5);
+  summaryRange.setValues(summaryData);
+  summaryRange.getCell(1, 1).setFontWeight('bold').setBackground('#E8EAED');
+  
+  // Format
+  reportSheet.getRange(4, 5, filteredTx.length, 1).setNumberFormat('#,##0.00000'); // Khối lượng
+  reportSheet.getRange(4, 6, filteredTx.length, 2).setNumberFormat('#,##0'); // Giá và thành tiền
+  reportSheet.autoResizeColumns(1, headers.length);
+  
+  return {
+    success: true,
+    message: `Đã tạo báo cáo "${reportName}"`
+  };
+}
+
+// Add this to the createCustomMenu function
+function createCustomMenu() {
+  const ui = SpreadsheetApp.getUi();
+  const menu = ui.createMenu('Trading System')
+    .addItem('Nhập lệnh MUA', 'showBuyForm')
+    .addItem('Nhập lệnh BÁN', 'showSellForm')
+    .addSeparator()
+    .addItem('Sửa giao dịch', 'showEditTransaction') // Chỉ giữ lại mục này
+    .addSeparator()
+    .addItem('Thêm tiền', 'showAddMoneyForm')
+    .addItem('Thêm vàng', 'showAddGoldForm')
+    .addSeparator()
+    .addItem('Đối soát vàng', 'showGoldReconciliation')
+    .addItem('Đối soát tiền', 'showMoneyReconciliation')
+    .addSeparator()
+    .addItem('Báo cáo ngày', 'generateDailyReport')
+    .addItem('Báo cáo tổng hợp', 'showReportOptions')
+    .addSeparator()
+    .addItem('Reset hệ thống', 'showResetConfirmation');
+    
+  menu.addToUi();
+}
+
+// Add these new functions
+function showResetConfirmation() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Xác nhận reset hệ thống',
+    'Bạn có chắc chắn muốn reset toàn bộ hệ thống?\n' +
+    'Thao tác này sẽ xóa tất cả dữ liệu hiện tại và khởi tạo lại với số dư ban đầu.\n\n' +
+    'Bạn có muốn thay đổi số dư ban đầu không?',
+    ui.ButtonSet.YES_NO_CANCEL
+  );
+  
+  if (response === ui.Button.CANCEL) {
+    return;
+  }
+  
+  if (response === ui.Button.YES) {
+    showInitialBalanceForm();
+  } else {
+    resetSystem(CONFIG.INITIAL_BALANCE.MONEY, CONFIG.INITIAL_BALANCE.GOLD);
+  }
+}
+
+function showInitialBalanceForm() {
+  const fields = `
+    <div class="form-group">
+      <label>Số tiền ban đầu:</label>
+      <input type="number" name="money" value="${CONFIG.INITIAL_BALANCE.MONEY}" required>
+    </div>
+    <div class="form-group">
+      <label>Số vàng ban đầu (chỉ):</label>
+      <input type="number" name="gold" value="${CONFIG.INITIAL_BALANCE.GOLD}" step="0.01" required>
+    </div>
+  `;
+  
+  const html = HtmlService.createHtmlOutput(createFormHtml('Số dư ban đầu', 'initialBalanceForm', fields))
+    .setWidth(300)
+    .setHeight(200);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Nhập số dư ban đầu');
+}
+
+function resetSystem(initialMoney, initialGold) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Update config if values are different
+  if (initialMoney !== CONFIG.INITIAL_BALANCE.MONEY || initialGold !== CONFIG.INITIAL_BALANCE.GOLD) {
+    CONFIG.INITIAL_BALANCE.MONEY = initialMoney;
+    CONFIG.INITIAL_BALANCE.GOLD = initialGold;
+    CONFIG.START_DATE = new Date().toISOString();
+  }
+  
+  // Delete all sheets except the first one
+  const sheets = ss.getSheets();
+  for (let i = sheets.length - 1; i > 0; i--) {
+    ss.deleteSheet(sheets[i]);
+  }
+  
+  // Clear the first sheet
+  sheets[0].clear();
+  
+  // Reinitialize system
+  initializeSystem();
+  
+  // Show confirmation
+  const ui = SpreadsheetApp.getUi();
+  ui.alert(
+    'Reset hoàn tất',
+    'Hệ thống đã được reset với:\n' +
+    `- Số tiền ban đầu: ${initialMoney.toLocaleString('vi-VN')} VND\n` +
+    `- Số vàng ban đầu: ${initialGold} chỉ\n\n` +
+    'Bạn có thể bắt đầu nhập dữ liệu mới.',
+    ui.ButtonSet.OK
+  );
+}
+
+// Add this case to processFormSubmission function
+function processFormSubmission(formData) {
+  Logger.log('Received form data:', formData);
+  
+  try {
+    let result;
+    switch(formData.formId) {
+      case 'buyForm':
+        result = processTransaction(formData, 'MUA');
+        break;
+      case 'sellForm':
+        result = processTransaction(formData, 'BÁN');
+        break;
+      case 'addMoneyForm':
+        result = processAddMoney(formData);
+        break;
+      case 'addGoldForm':
+        result = processAddGold(formData);
+        break;
+      case 'reportForm':
+        result = processReportForm(formData);
+        break;
+      case 'editTransaction':
+        result = editTransaction(formData);
+        break;
+      case 'adjustAmount':
+        result = adjustTransactionAmount(formData);
+        break;
+      case 'initialBalanceForm':
+        result = resetSystem(
+          parseFloat(formData.money), 
+          parseFloat(formData.gold)
+        );
+        break;
+      default:
+        throw new Error('Không xác định được loại form');
+    }
+    
+    // Log successful operation
+    Logger.log('Operation completed successfully:', {
+      formId: formData.formId,
+      timestamp: new Date().toISOString(),
+      user: CONFIG.USER,
+      result: result
+    });
+    
+    return {
+      success: true,
+      message: result.message || 'Thao tác thành công'
+    };
+  } catch (error) {
+    // Log error details
+    Logger.log('Error in processFormSubmission:', {
+      formId: formData.formId,
+      timestamp: new Date().toISOString(),
+      user: CONFIG.USER,
+      error: error.toString(),
+      formData: formData
+    });
+    
+    return {
+      success: false,
+      message: error.toString()
+    };
+  }
+}
+
+// =========== TRANSACTION EDITING ===========
+
+function showAdjustAmount() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <style>
+          body { font-family: Arial, sans-serif; padding: 10px; }
+          .form-group { margin-bottom: 15px; }
+          label { display: block; margin-bottom: 5px; font-weight: bold; }
+          input, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+          .submit-btn { background-color: #4CAF50; color: white; padding: 10px; border: none; cursor: pointer; }
+          .submit-btn:hover { background-color: #45a049; }
+            .message-box {
+    white-space: pre-line;
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+        </style>
+      </head>
+      <body>
+        <form id="adjustForm" onsubmit="handleSubmit(event)">
+          <input type="hidden" name="formId" value="adjustAmount">
+          <div class="form-group">
+            <label>Mã giao dịch:</label>
+            <input type="text" name="transactionId" required>
+          </div>
+          <div class="form-group">
+            <label>Khối lượng thực tế (chỉ):</label>
+            <input type="number" name="actualAmount" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label>Lý do điều chỉnh:</label>
+            <textarea name="reason" required rows="3"></textarea>
+          </div>
+          <input type="submit" value="Điều chỉnh" class="submit-btn">
+        </form>
+        <script>
+          function handleSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('adjustForm');
+            const formData = new FormData(form);
+            const data = {
+              formId: 'adjustAmount'
+            };
+            
+            formData.forEach((value, key) => {
+              data[key] = value;
+            });
+            
+            google.script.run
+              .withSuccessHandler(function(response) {
+                if (response.success) {
+                  alert(response.message);
+                  google.script.host.close();
+                } else {
+                  alert('Lỗi: ' + response.message);
+                }
+              })
+              .withFailureHandler(function(error) {
+                alert('Lỗi: ' + error);
+              })
+              .processFormSubmission(data);
+          }
+        </script>
+      </body>
+    </html>
+  `)
+  .setWidth(400)
+  .setHeight(300);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Điều chỉnh khối lượng');
+}
+
+// =========== TRANSACTION EDITING ===========
+function showEditTransaction() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <style>
+          body { font-family: Arial, sans-serif; padding: 10px; }
+          .form-group { margin-bottom: 15px; }
+          label { display: block; margin-bottom: 5px; font-weight: bold; }
+          input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+          .submit-btn { background-color: #4CAF50; color: white; padding: 10px; border: none; cursor: pointer; }
+          .submit-btn:hover { background-color: #45a049; }
+            .message-box {
+    white-space: pre-line;
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+        </style>
+      </head>
+      <body>
+        <form id="searchForm" onsubmit="handleSearch(event)">
+          <div class="form-group">
+            <label>Mã giao dịch:</label>
+            <input type="text" name="transactionId" required>
+          </div>
+          <input type="submit" value="Tìm kiếm" class="submit-btn">
+        </form>
+        <div id="editFormContainer"></div>
+        <script>
+          function handleSearch(e) {
+            e.preventDefault();
+            const id = document.getElementsByName('transactionId')[0].value;
+            google.script.run
+              .withSuccessHandler(showEditForm)
+              .withFailureHandler(function(error) {
+                alert('Lỗi: ' + error);
+              })
+              .getTransactionDetails(id);
+          }
+          
+          function showEditForm(result) {
+            if (!result) {
+              alert('Không tìm thấy giao dịch');
+              return;
+            }
+            document.getElementById('editFormContainer').innerHTML = result.formHtml;
+            document.getElementById('searchForm').style.display = 'none';
+          }
+          
+          function handleEdit(e) {
+            e.preventDefault();
+            const form = document.getElementById('editForm');
+            const formData = new FormData(form);
+            const data = {
+              formId: 'editTransaction'
+            };
+            
+            formData.forEach((value, key) => {
+              data[key] = value;
+            });
+            
+            google.script.run
+              .withSuccessHandler(function(response) {
+                    if (response.success) {
+                      const messageDiv = document.createElement('div');
+                      messageDiv.className = 'message-box';
+                      messageDiv.textContent = response.message;
+                      document.body.appendChild(messageDiv);
+                      
+                      // Tự động đóng form sau 30 giây
+                      setTimeout(function() {
+                        google.script.host.close();
+                      }, 30000);
+                    } else {
+                      alert('Lỗi: ' + response.message);
+                    }
+                  })
+              .withFailureHandler(function(error) {
+                alert('Lỗi: ' + error);
+              })
+              .processFormSubmission(data);
+          }
+        </script>
+      </body>
+    </html>
+  `)
+  .setWidth(400)
+  .setHeight(500);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Sửa giao dịch');
+}
+
+function getTransactionDetails(transactionId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  // Log để debug
+  Logger.log('Searching for transaction ID: ' + transactionId);
+  
+  for (let i = 1; i < data.length; i++) {
+    // Chuyển ID giao dịch về cùng định dạng để so sánh
+    const currentId = String(data[i][0]).trim();
+    const searchId = String(transactionId).trim();
+    
+    Logger.log(`Row ${i}: ID=${currentId}, Timestamp=${data[i][1]}`);
+    
+    if (currentId === searchId) {
+      const transaction = {};
+      headers.forEach((header, index) => {
+        // Xử lý đặc biệt cho timestamp
+        if (header === 'Timestamp') {
+          // Đảm bảo timestamp luôn ở định dạng chuẩn
+          const date = new Date(data[i][index]);
+          transaction[header] = getHanoiTime(date);
+        } else {
+          transaction[header] = data[i][index];
+        }
+      });
+      
+      Logger.log('Found transaction:', transaction);
+      
+      // Create bank account options
+      const bankAccountOptions = CONFIG.BANK_ACCOUNTS.map(acc => 
+        `<option value="${acc}" ${acc === transaction['Tài khoản GD'] ? 'selected' : ''}>${acc}</option>`
+      ).join('');
+
+      const formHtml = `
+        <form id="editForm" onsubmit="handleEdit(event)">
+          <input type="hidden" name="rowIndex" value="${i+1}">
+          <input type="hidden" name="formId" value="editTransaction">
+          <div class="form-group">
+            <label>Mã giao dịch: ${transactionId}</label>
+            <input type="hidden" name="transactionId" value="${transactionId}">
+          </div>
+          <div class="form-group">
+            <label>Thời gian giao dịch:</label>
+            <input type="text" readonly value="${transaction['Timestamp']}">
+          </div>
+          <div class="form-group">
+            <label>Loại giao dịch:</label>
+            <input type="text" readonly value="${transaction['Loại GD']}">
+          </div>
+          <div class="form-group">
+            <label>Khối lượng (chỉ):</label>
+            <input type="number" name="amount" step="0.00001" min="0" value="${transaction['Khối lượng']}" required>
+          </div>
+          <div class="form-group">
+            <label>Giá (4 số đầu):</label>
+            <input type="number" name="price" value="${Math.floor(transaction['Giá']/1000)}" required>
+          </div>
+          <div class="form-group">
+            <label>Đối tác:</label>
+            <input type="text" name="partner" value="${transaction['Đối tác']}" required>
+          </div>
+          <div class="form-group">
+            <label>SĐT đối tác:</label>
+            <input type="tel" name="phone" value="${transaction['SĐT đối tác']}" required>
+          </div>
+          <div class="form-group">
+            <label>Tài khoản:</label>
+            <select name="account" required>
+              ${bankAccountOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ghi chú cũ:</label>
+            <textarea readonly rows="2">${transaction['Ghi chú'] || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Lý do sửa:</label>
+            <textarea name="reason" required rows="3" placeholder="Ghi rõ lý do thay đổi"></textarea>
+          </div>
+          <input type="submit" value="Cập nhật" class="submit-btn">
+        </form>
+      `;
+      
+      return {
+        transaction: transaction,
+        formHtml: formHtml
+      };
+    }
+  }
+  
+  Logger.log('Transaction not found: ' + transactionId);
+  throw new Error('Không tìm thấy giao dịch ' + transactionId);
+}
+
+function editTransaction(formData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.TRANSACTIONS);
+  const row = parseInt(formData.rowIndex);
+  const oldData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  // Calculate new values
+  const newAmount = parseFloat(parseFloat(formData.amount).toFixed(5));
+  const newPrice = parseInt(formData.price) * 1000;
+  const newTotal = newAmount * newPrice;
+  const newAccount = formData.account;
+  
+  // Calculate old total
+  const oldTotal = oldData[6]; // Lấy thành tiền cũ từ cột 7
+  
+  // Prepare update data
+  const updateData = [...oldData];
+  updateData[4] = newAmount; // Khối lượng
+  updateData[5] = newPrice; // Giá
+  updateData[6] = newTotal; // Thành tiền
+  updateData[7] = formData.partner; // Đối tác
+  updateData[8] = formData.phone; // SĐT
+  updateData[9] = newAccount; // Tài khoản mới
+  
+  // Add change note
+  const oldNote = updateData[16] || '';
+  const timestamp = getHanoiTime();
+  const changes = [];
+  
+  // Ghi lại các thay đổi
+  if (newAmount !== oldData[4]) {
+    changes.push(`KL: ${oldData[4]} → ${newAmount}`);
+  }
+  if (newPrice !== oldData[5]) {
+    changes.push(`Giá: ${oldData[5].toLocaleString('vi-VN')} → ${newPrice.toLocaleString('vi-VN')}`);
+  }
+  if (newAccount !== oldData[9]) {
+    // Hoàn tiền về tài khoản cũ
+    updateBankAccount(oldData[9], 
+                     oldData[2] === 'MUA' ? oldTotal : -oldTotal,
+                     oldData[10]);
+                     
+    // Trừ tiền từ tài khoản mới
+    updateBankAccount(newAccount,
+                     oldData[2] === 'MUA' ? -oldTotal : oldTotal,
+                     oldData[10]);
+                     
+    changes.push(`TK: ${oldData[9]} → ${newAccount}`);
+  }
+  
+  // Update amount and total if changed
+  if (newAmount !== oldData[4] || newPrice !== oldData[5]) {
+    // Hoàn tiền về tài khoản cũ nếu có thay đổi số tiền
+    if (oldTotal !== newTotal) {
+      updateBankAccount(oldData[9],
+                       oldData[2] === 'MUA' ? oldTotal : -oldTotal,
+                       oldData[10]);
+      
+      // Trừ tiền mới từ tài khoản
+      updateBankAccount(newAccount,
+                       oldData[2] === 'MUA' ? -newTotal : newTotal,
+                       oldData[10]);
+    }
+    
+    // Update inventory if amount changed
+    if (newAmount !== oldData[4]) {
+      const diffAmount = newAmount - oldData[4];
+      updateInventory(oldData[3], // Loại vàng
+                     oldData[2] === 'MUA' ? diffAmount : -diffAmount, // Thay đổi khối lượng
+                     oldData[10]); // Hình thức
+    }
+  }
+  
+  // Add changes to note
+  if (changes.length > 0) {
+    updateData[16] = `${oldNote}${oldNote ? '\n' : ''}${timestamp} - Sửa: ${changes.join(', ')} - ${formData.reason}`;
+  }
+  
+  // Update sheet
+  sheet.getRange(row, 1, 1, updateData.length).setValues([updateData]);
+  
+  // Log the changes
+  Logger.log('Transaction edited:', {
+    id: oldData[0],
+    changes: changes,
+    reason: formData.reason,
+    timestamp: timestamp,
+    user: CONFIG.USER
+  });
+  
+  return {
+    success: true,
+    message: `Đã cập nhật giao dịch ${oldData[0]}\n` +
+             (changes.length > 0 ? `Các thay đổi:\n${changes.join('\n')}` : 'Không có thay đổi')
+  };
+}
+
+function formatAmount(amount) {
+  return parseFloat(amount).toFixed(5);
+}
+
+// =========== PRICE CALCULATION FUNCTIONS ===========
+function calculateExitPoints(price) {
+  const points = {
+    takeProfit: {
+      level1: {
+        price: Math.round(price * (1 + 0.0025)), // +0.25% (~25 giá)
+        percentage: '60%'
+      },
+      level2: {
+        price: Math.round(price * (1 + 0.0030)), // +0.30% (~30 giá)
+        percentage: '40%'
+      }
+    },
+    stopLoss: {
+      level1: {
+        price: Math.round(price * (1 - 0.0020)), // -0.20% (~20 giá)
+        percentage: '60%'
+      },
+      level2: {
+        price: Math.round(price * (1 - 0.0025)), // -0.25% (~25 giá)
+        percentage: '40%'
+      }
+    }
+  };
+  
+  return points;
+}
+
+function formatExitPointsMessage(exitPoints, amount) {
+  const amount1 = parseFloat((amount * 0.6).toFixed(5));
+  const amount2 = parseFloat((amount * 0.4).toFixed(5));
+  
+  return `
+=== GỢI Ý ĐIỂM THOÁT LỆNH (Phương pháp Pyramid) ===
+
+CHỐT LỜI:
+1. ${amount1} chỉ tại giá ${exitPoints.takeProfit.level1.price.toLocaleString('vi-VN')} (+25 giá)
+2. ${amount2} chỉ tại giá ${exitPoints.takeProfit.level2.price.toLocaleString('vi-VN')} (+30 giá)
+
+CẮT LỖ:
+1. ${amount1} chỉ tại giá ${exitPoints.stopLoss.level1.price.toLocaleString('vi-VN')} (-20 giá)
+2. ${amount2} chỉ tại giá ${exitPoints.stopLoss.level2.price.toLocaleString('vi-VN')} (-25 giá)
+
+Lưu ý: Đây chỉ là gợi ý dựa trên chiến lược Pyramid (Kim Tự Tháp)
+Điều chỉnh theo tình hình thị trường thực tế.
+`;
+}
