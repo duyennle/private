@@ -353,17 +353,51 @@ function showBuyForm() {
       <input type="number" name="amount" step="0.00001" min="0" required onchange="updateAllCalculations()">
     </div>
     <div class="form-group">
-      <label>Giá (4 số đầu):</label>
-      <input type="number" name="price" required onchange="updateAllCalculations()">
+      <label>Giá (VND):</label>
+      <input type="number" 
+            name="price" 
+            step="any"
+            required 
+            onchange="updateAllCalculations()"
+            oninput="this.setCustomValidity('')">
+      <small class="hint">Có thể nhập số thập phân</small>
     </div>
+
+    <div class="form-group">
+      <label>Thành tiền:</label>
+      <div class="total-input-group">
+        <input type="number" 
+              id="totalAmount" 
+              name="totalAmount" 
+              step="1"
+              onchange="handleTotalChange()">
+        <input type="hidden" id="isRounded" name="isRounded" value="false">
+        <div class="checkbox-wrapper">
+          <input type="checkbox" 
+                id="roundTotal" 
+                name="roundTotal" 
+                onchange="handleRoundTotal()">
+          <label for="roundTotal">Làm tròn xuống</label>
+        </div>
+      </div>
+      <small class="price-adjustment" id="priceAdjustment"></small>
+    </div>
+
     <div class="form-group">
       <label>Stop Loss (SL):</label>
-      <input type="number" name="sl" required>
+      <input type="number"
+            name="sl"
+            step="any"
+            required>
       <small class="suggestion" id="slSuggestion"></small>
     </div>
+
     <div class="form-group">
       <label>Take Profit (TP):</label>
-      <input type="number" name="tp" required>
+      <input type="number"
+            name="tp"
+            step="any"
+            required>
       <small class="suggestion" id="tpSuggestion"></small>
     </div>
     <div class="form-group">
@@ -432,23 +466,23 @@ function showBuyForm() {
         updateProfitLossPreview();
       }
 
-      function updateSuggestions() {
-        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
-        var amount = parseFloat(document.getElementsByName('amount')[0].value);
-        
-        if (price && !isNaN(price)) {
-          var sl = Math.round(price * 0.998); // -0.2%
-          var tp = Math.round(price * 1.0025); // +0.25%
+        function updateSuggestions() {
+          const price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
           
-          document.getElementsByName('sl')[0].value = sl;
-          document.getElementsByName('tp')[0].value = tp;
-          
-          document.getElementById('slSuggestion').textContent = 
-            'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (-0.2%)';
-          document.getElementById('tpSuggestion').textContent = 
-            'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (+0.25%)';
+          if (price && !isNaN(price)) {
+            // Giữ nguyên độ chính xác của số thập phân
+            const sl = price * 0.998; // -0.2%
+            const tp = price * 1.0025; // +0.25%
+            
+            document.getElementsByName('sl')[0].value = (sl/1000).toString();
+            document.getElementsByName('tp')[0].value = (tp/1000).toString();
+            
+            document.getElementById('slSuggestion').textContent = 
+              'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (-0.2%)';
+            document.getElementById('tpSuggestion').textContent = 
+              'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (+0.25%)';
+          }
         }
-      }
 
       function updateProfitLossPreview() {
         var isClosing = document.getElementById('isClosingTrade').checked;
@@ -465,6 +499,56 @@ function showBuyForm() {
               document.getElementById('profitLossPreview').innerHTML = preview;
             })
             .calculateProfitLossPreview(originalId, price, goldType, amount);
+        }
+      }
+      function updateAllCalculations() {
+        calculateTotal();
+        updateSuggestions();
+      }
+
+      function calculateTotal() {
+        const price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        const amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (price && amount && !isNaN(price) && !isNaN(amount)) {
+          const total = amount * price;
+          document.getElementById('totalAmount').value = Math.round(total);
+        }
+      }
+
+      // Trong form (phần JavaScript)
+      function handleTotalChange() {
+        const amount = parseFloat(document.getElementsByName('amount')[0].value);
+        const newTotal = parseFloat(document.getElementById('totalAmount').value);
+        
+        if (amount && newTotal && !isNaN(amount) && !isNaN(newTotal)) {
+          // Tính giá mới dựa trên tổng tiền mới
+          const newPrice = newTotal / (amount * 1000);
+          // Lưu giá với đầy đủ độ chính xác
+          document.getElementsByName('price')[0].value = newPrice.toFixed(10);
+          
+          // Hiển thị thông tin điều chỉnh
+          document.getElementById('priceAdjustment').innerHTML = 
+            'Giá điều chỉnh: <span class="adjusted-price">' + 
+            (newPrice * 1000).toLocaleString('vi-VN', {
+              minimumFractionDigits: 4,
+              maximumFractionDigits: 4
+            }) + '</span>';
+          
+          // Cập nhật SL/TP dựa trên giá mới
+          updateSuggestions();
+        }
+      }
+
+      function handleRoundTotal() {
+        const total = parseFloat(document.getElementById('totalAmount').value);
+        if (total && !isNaN(total)) {
+          if (document.getElementById('roundTotal').checked) {
+            // Làm tròn xuống đến hàng nghìn
+            const roundedTotal = Math.floor(total / 1000) * 1000;
+            document.getElementById('totalAmount').value = roundedTotal;
+            handleTotalChange();
+          }
         }
       }
     </script>
@@ -489,6 +573,31 @@ function showBuyForm() {
         border-left: 3px solid #4CAF50;
         padding-left: 10px;
         margin: 10px 0;
+      }
+      .total-input-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .checkbox-wrapper input[type="checkbox"] {
+        width: auto;
+      }
+      .checkbox-wrapper label {
+        font-weight: normal;
+      }
+      .price-adjustment {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+      }
+      .adjusted-price {
+        font-weight: bold;
+        color: #2c3e50;
       }
     </style>
   `;
@@ -544,17 +653,51 @@ function showSellForm() {
       <input type="number" name="amount" step="0.00001" min="0" required onchange="updateAllCalculations()">
     </div>
     <div class="form-group">
-      <label>Giá (4 số đầu):</label>
-      <input type="number" name="price" required onchange="updateAllCalculations()">
+      <label>Giá (VND):</label>
+      <input type="number" 
+            name="price" 
+            step="any"
+            required 
+            onchange="updateAllCalculations()"
+            oninput="this.setCustomValidity('')">
+      <small class="hint">Có thể nhập số thập phân</small>
     </div>
+
+    <div class="form-group">
+      <label>Thành tiền:</label>
+      <div class="total-input-group">
+        <input type="number" 
+              id="totalAmount" 
+              name="totalAmount" 
+              step="1"
+              onchange="handleTotalChange()">
+        <input type="hidden" id="isRounded" name="isRounded" value="false">
+        <div class="checkbox-wrapper">
+          <input type="checkbox" 
+                id="roundTotal" 
+                name="roundTotal" 
+                onchange="handleRoundTotal()">
+          <label for="roundTotal">Làm tròn xuống</label>
+        </div>
+      </div>
+      <small class="price-adjustment" id="priceAdjustment"></small>
+    </div>
+
     <div class="form-group">
       <label>Stop Loss (SL):</label>
-      <input type="number" name="sl" required>
+      <input type="number"
+            name="sl"
+            step="any"
+            required>
       <small class="suggestion" id="slSuggestion"></small>
     </div>
+
     <div class="form-group">
       <label>Take Profit (TP):</label>
-      <input type="number" name="tp" required>
+      <input type="number"
+            name="tp"
+            step="any"
+            required>
       <small class="suggestion" id="tpSuggestion"></small>
     </div>
     <div class="form-group">
@@ -627,25 +770,6 @@ function showSellForm() {
         updateProfitLossPreview();
       }
 
-      function updateSuggestions() {
-        var price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
-        var amount = parseFloat(document.getElementsByName('amount')[0].value);
-        
-        if (price && !isNaN(price)) {
-          // Đối với lệnh bán, đảo ngược SL và TP
-          var sl = Math.round(price * 1.002); // +0.2%
-          var tp = Math.round(price * 0.9975); // -0.25%
-          
-          document.getElementsByName('sl')[0].value = sl;
-          document.getElementsByName('tp')[0].value = tp;
-          
-          document.getElementById('slSuggestion').textContent = 
-            'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (+0.2%)';
-          document.getElementById('tpSuggestion').textContent = 
-            'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (-0.25%)';
-        }
-      }
-
       function updateProfitLossPreview() {
         var isClosing = document.getElementById('isClosingTrade').checked;
         if (!isClosing) return;
@@ -661,6 +785,72 @@ function showSellForm() {
               document.getElementById('profitLossPreview').innerHTML = preview;
             })
             .calculateProfitLossPreviewForSell(originalId, price, goldType, amount);
+        }
+      }
+      function updateAllCalculations() {
+        calculateTotal();
+        updateSuggestions();
+      }
+
+      function calculateTotal() {
+        const price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        const amount = parseFloat(document.getElementsByName('amount')[0].value);
+        
+        if (price && amount && !isNaN(price) && !isNaN(amount)) {
+          const total = amount * price;
+          document.getElementById('totalAmount').value = Math.round(total);
+        }
+      }
+
+      // Trong form (phần JavaScript)
+      function handleTotalChange() {
+        const amount = parseFloat(document.getElementsByName('amount')[0].value);
+        const newTotal = parseFloat(document.getElementById('totalAmount').value);
+        
+        if (amount && newTotal && !isNaN(amount) && !isNaN(newTotal)) {
+          // Tính giá mới dựa trên tổng tiền mới
+          const newPrice = newTotal / (amount * 1000);
+          // Lưu giá với đầy đủ độ chính xác
+          document.getElementsByName('price')[0].value = newPrice.toFixed(10);
+          
+          // Hiển thị thông tin điều chỉnh
+          document.getElementById('priceAdjustment').innerHTML = 
+            'Giá điều chỉnh: <span class="adjusted-price">' + 
+            (newPrice * 1000).toLocaleString('vi-VN', {
+              minimumFractionDigits: 4,
+              maximumFractionDigits: 4
+            }) + '</span>';
+          
+          // Cập nhật SL/TP dựa trên giá mới
+          updateSuggestions();
+        }
+      }
+
+      function handleRoundTotal() {
+        const total = parseFloat(document.getElementById('totalAmount').value);
+        if (total && !isNaN(total)) {
+          if (document.getElementById('roundTotal').checked) {
+            // Làm tròn xuống đến hàng nghìn
+            const roundedTotal = Math.floor(total / 1000) * 1000;
+            document.getElementById('totalAmount').value = roundedTotal;
+            handleTotalChange();
+          }
+        }
+      }
+      function updateSuggestions() {
+        const price = parseFloat(document.getElementsByName('price')[0].value) * 1000;
+        
+        if (price && !isNaN(price)) {
+          const sl = price * 1.002; // +0.2%
+          const tp = price * 0.9975; // -0.25%
+          
+          document.getElementsByName('sl')[0].value = (sl/1000).toString();
+          document.getElementsByName('tp')[0].value = (tp/1000).toString();
+          
+          document.getElementById('slSuggestion').textContent = 
+            'Gợi ý SL: ' + sl.toLocaleString('vi-VN') + ' (+0.2%)';
+          document.getElementById('tpSuggestion').textContent = 
+            'Gợi ý TP: ' + tp.toLocaleString('vi-VN') + ' (-0.25%)';
         }
       }
     </script>
@@ -685,6 +875,31 @@ function showSellForm() {
         border-left: 3px solid #e74c3c;
         padding-left: 10px;
         margin: 10px 0;
+      }
+      .total-input-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .checkbox-wrapper input[type="checkbox"] {
+        width: auto;
+      }
+      .checkbox-wrapper label {
+        font-weight: normal;
+      }
+      .price-adjustment {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+      }
+      .adjusted-price {
+        font-weight: bold;
+        color: #2c3e50;
       }
     </style>
   `;
@@ -712,6 +927,31 @@ function calculateProfitLossPreviewForSell(originalId, price, goldType, amount) 
     '<p>Giá quy đổi về ' + originalTx.goldType + ': ' + normalizedPrice.toLocaleString('vi-VN') + '</p>' +
     '<p>Lãi/Lỗ dự kiến: ' + pl.toLocaleString('vi-VN') + '</p>' +
     '</div>';
+}
+
+function showAddMoneyForm() {
+  const fields = `
+    <div class="form-group">
+      <label>Tài khoản:</label>
+      <select name="account" required>
+        ${CONFIG.BANK_ACCOUNTS.map(acc => `<option value="${acc}">${acc}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Số tiền:</label>
+      <input type="number" name="amount" required>
+    </div>
+    <div class="form-group">
+      <label>Nguồn tiền:</label>
+      <input type="text" name="source" required>
+    </div>
+  `;
+  
+  const html = HtmlService.createHtmlOutput(createFormHtml('Thêm tiền', 'addMoneyForm', fields))
+    .setWidth(300)
+    .setHeight(250);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Thêm tiền');
 }
 
 function showAddGoldForm() {
@@ -983,6 +1223,26 @@ function findTransaction(transactionId) {
   return null;
 }
 
+// Trong validateTransaction
+function validateTransaction(formData) {
+  const amount = parseFloat(formData.amount);
+  const total = parseFloat(formData.totalAmount);
+  
+  if (formData.isRounded === 'true') {
+    // Kiểm tra tổng tiền đã làm tròn
+    if (total % 1000 !== 0) {
+      throw new Error('Tổng tiền làm tròn phải là bội số của 1000');
+    }
+    
+    // Tính giá mới từ tổng đã làm tròn
+    const newPrice = total / (amount * 1000);
+    // Cập nhật lại giá trong formData
+    formData.price = newPrice.toString();
+  }
+  
+  return true;
+}
+
 function processTransaction(formData, type) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const txSheet = ss.getSheetByName(SHEETS.TRANSACTIONS);
@@ -991,14 +1251,24 @@ function processTransaction(formData, type) {
   const id = generateTransactionId(type);
   const timestamp = getHanoiTime();
   const amount = parseFloat(parseFloat(formData.amount).toFixed(5));
-  const price = parseInt(formData.price) * 1000;
-  const total = amount * price;
-  const sl = parseInt(formData.sl);
-  const tp = parseInt(formData.tp);
+  let price = parseFloat(formData.price) * 1000;
+  let total = amount * price;
+  
+  // Nếu đã làm tròn, tính lại giá chính xác từ tổng tiền đã làm tròn
+  if (formData.isRounded === 'true') {
+    total = Math.floor(total / 1000) * 1000;
+    // Tính giá chính xác từ tổng đã làm tròn
+    price = total / amount;
+  }
 
+  // Làm tròn giá để lưu vào sheet với 4 số thập phân
+  const priceForSheet = parseFloat(price.toFixed(4));
+
+  // Khởi tạo biến actualPL và plNote
   let actualPL = 0;
   let plNote = '';
-  
+
+  // Tính lãi/lỗ thực tế nếu là lệnh đóng
   if (formData.originalId) {
     actualPL = calculateActualPL(amount, price, formData.goldType, formData.originalId);
     const originalTx = findTransaction(formData.originalId);
@@ -1013,29 +1283,39 @@ function processTransaction(formData, type) {
     }
   }
 
+  // Tính SL/TP dựa trên loại lệnh
+  let sl, tp;
+  if (type === 'MUA') {
+    sl = parseFloat((price * 0.998).toFixed(4));  // -0.2%
+    tp = parseFloat((price * 1.0025).toFixed(4)); // +0.25%
+  } else {
+    sl = parseFloat((price * 1.002).toFixed(4));  // +0.2%
+    tp = parseFloat((price * 0.9975).toFixed(4)); // -0.25%
+  }
+
   // Prepare row data
   const rowData = [
-    id,                     // ID Giao dịch
-    timestamp,             // Timestamp
-    type,                 // Loại GD
-    formData.goldType,    // Loại vàng
-    amount,              // Khối lượng
-    price,              // Giá
-    total,             // Thành tiền
-    formData.partner,  // Đối tác
-    formData.phone,   // SĐT đối tác
-    formData.account, // Tài khoản GD
-    formData.tradeType, // Hình thức
-    formData.dueDate || '', // Ngày hẹn
+    id,                         // ID Giao dịch
+    timestamp,                  // Timestamp
+    type,                       // Loại GD
+    formData.goldType,         // Loại vàng
+    amount,                     // Khối lượng
+    priceForSheet,             // Giá (4 số thập phân)
+    total,                     // Thành tiền (đã làm tròn nếu có)
+    formData.partner,          // Đối tác
+    formData.phone,            // SĐT đối tác
+    formData.account,          // Tài khoản GD
+    formData.tradeType,        // Hình thức
+    formData.dueDate || '',    // Ngày hẹn
     formData.originalId || '', // Mã gốc
-    '', // Khối lượng còn lại
+    '',                        // Khối lượng còn lại
     calculateExpectedPL(amount, price, formData.goldType, type), // Lãi/lỗ dự kiến
-    actualPL, // Lãi/lỗ thực tế
-    formData.sl, // SL
-    formData.tp, // TP
-    plNote // Ghi chú
+    actualPL,                  // Lãi/lỗ thực tế
+    sl,                        // SL
+    tp,                        // TP
+    plNote                     // Ghi chú
   ];
-  
+
   // Add transaction
   txSheet.appendRow(rowData);
   
@@ -1053,7 +1333,7 @@ function processTransaction(formData, type) {
 
   return {
     success: true,
-    message: `Đã thêm giao dịch ${id}\n\nĐiểm dừng:\nSL: ${sl.toLocaleString('vi-VN')}\nTP: ${tp.toLocaleString('vi-VN')}`,
+    message: `Đã thêm giao dịch ${id}\n\nGiá: ${priceForSheet.toLocaleString('vi-VN')}\nThành tiền: ${total.toLocaleString('vi-VN')}\n\nĐiểm dừng:\nSL: ${sl.toLocaleString('vi-VN')}\nTP: ${tp.toLocaleString('vi-VN')}`,
     data: rowData
   };
 }
